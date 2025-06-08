@@ -2,8 +2,10 @@
   <input type="text" 
          id="search-input" 
          placeholder="Enter search query..."
-         aria-label="Semantic search query">
+         aria-label="Semantic search query"
+         aria-live="polite">
   <button id="search-button">Search</button>
+  <div id="loader" class="loader hidden" aria-live="assertive"></div>
 </div>
 
 <style>
@@ -33,5 +35,26 @@
 
 #search-button:hover {
   background: #0069d9;
+}
+
+.loader {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-left: 1rem;
+  vertical-align: middle;
+}
+
+.hidden {
+  display: none;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style>
