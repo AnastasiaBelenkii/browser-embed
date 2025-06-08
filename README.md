@@ -1,5 +1,7 @@
 # Browser-Based Semantic Search Visualizer
 
+SUPER in Progress. Everything below is hopes and dreams (:
+
 ## Project Goals
 
 A fully client-side semantic search engine that:
@@ -54,30 +56,13 @@ graph TB
    - Optional 3D view with Three.js
    - Interactive result exploration
 
-## Development Timeline
-
-| Week | Focus Area              | Deliverables                          |
-|------|-------------------------|---------------------------------------|
-| 1    | Core Architecture       | Basic embedding + search              |
-| 2    | Storage + Visualization | IndexedDB integration, 2D views       |
-| 3    | UI Polish               | React components, 3D visualization    |
-| 4    | Optimization            | Performance tuning, advanced features |
-
 ## Getting Started
 
-1. Clone the repository
-2. Run a local server (no build step required)
-```bash
-python3 -m http.server
-```
-3. Open `http://localhost:8000/docs` in browser
+TBD
 
 ## Contribution Guidelines
 
-Email anastasia@belenky.net with proposals. PRs welcome for:
-- Visualization improvements
-- Performance optimizations
-- Additional transformer models
+This is a learning project for me, but feel free to use this however you want (according to license) or make PRs if you feel like it. Reach out at anastasia@belenky.net if you have any questions
 
 ## License
 AGPL-3.0 - See [LICENSE](/LICENSE)
