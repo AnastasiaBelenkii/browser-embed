@@ -54,20 +54,6 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
       const response = await fetch(file);
       element.outerHTML = await response.text();
-      
-      // Add search button handler
-      const searchButton = document.getElementById('search-button');
-      const searchInput = document.getElementById('search-input');
-      const loader = document.getElementById('loader');
-      
-      searchButton.addEventListener('click', () => {
-        loader.classList.remove('hidden');
-        // TODO: Add actual search functionality
-        setTimeout(() => {
-          loader.classList.add('hidden');
-        }, 1500);
-      });
-      
     } catch (error) {
       console.error('Error loading component:', error);
     }
