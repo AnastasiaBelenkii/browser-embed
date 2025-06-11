@@ -36,10 +36,18 @@ async function handleSearch() {
       normalize: true
     });
     
-    // Convert to array and display in results container
+    // Convert to array and display formatted results
     const embedding = Array.from(output.data);
-    document.getElementById('results-container').textContent = 
-      `Generated embedding with ${embedding.length} dimensions`;
+    const resultsDiv = document.getElementById('results-container');
+    resultsDiv.innerHTML = `
+      <h3>Generated embedding (${embedding.length} dimensions):</h3>
+      <div class="embedding-values">${embedding.slice(0,10).map(v => v.toFixed(4)).join(', ')}...</div>
+      <div class="embedding-meta">
+        Min: ${Math.min(...embedding).toFixed(4)}, 
+        Max: ${Math.max(...embedding).toFixed(4)},
+        Avg: ${(embedding.reduce((a,b) => a + b, 0)/embedding.length).toFixed(4)}
+      </div>
+    `;
     
   } catch (error) {
     console.error('Embedding failed:', error);
