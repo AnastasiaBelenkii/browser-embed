@@ -9,15 +9,8 @@
 
 <script>
 async function handleSearch() {
-  // Ensure transformers is loaded - may take a moment on first load
-  if (typeof transformers === 'undefined') {
-    await new Promise(resolve => {
-      const check = () => {
-        if (typeof transformers !== 'undefined') return resolve();
-        setTimeout(check, 100);
-      };
-      check();
-    });
+  if (!this._pipeline) {
+    this._pipeline = await transformers.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
   }
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
@@ -27,13 +20,13 @@ async function handleSearch() {
   button.textContent = 'Processing...';
 
   try {
-    // Generate embedding using the already imported pipeline
-    const output = await transformers.pipeline(
-      'feature-extraction',
-      'Xenova/all-MiniLM-L6-v2'
-    )(query, {
+    // Generate embedding using cached pipeline
+    const output = await this._pipeline(query, {
       pooling: 'mean',
-      normalize: true
+      normalize: true,
+      progress_callback: (progress) => {
+        console.log(`Progress: ${Math.round(progress.loaded/progress.total * 100)}%`);
+      }
     });
     
     // Convert to array and display formatted results
