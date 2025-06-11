@@ -54,10 +54,7 @@ document.addEventListener('DOMContentLoaded', function() {
   includes.forEach(async element => {
     const file = element.getAttribute('data-include');
     try {
-      const response = await fetch(file, {
-        mode: 'cors',
-        cache: 'no-cache'
-      });
+      const response = await fetch(file);
       element.outerHTML = await response.text();
     } catch (error) {
       console.error('Error loading component:', error);
