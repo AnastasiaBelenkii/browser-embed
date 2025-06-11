@@ -6,6 +6,43 @@
   <button id="search-button">Search</button>
 </div>
 
+<script>
+document.getElementById('search-button').addEventListener('click', async function() {
+  const query = document.getElementById('search-input').value.trim();
+  if (!query) return;
+
+  const button = this;
+  button.disabled = true;
+  button.textContent = 'Processing...';
+
+  try {
+    // Load the embedding pipeline
+    const pipeline = await transformers.pipeline(
+      'feature-extraction',
+      'Xenova/all-MiniLM-L6-v2'
+    );
+    
+    // Generate embedding
+    const output = await pipeline(query, {
+      pooling: 'mean',
+      normalize: true
+    });
+    
+    // Convert to array and display in results container
+    const embedding = Array.from(output.data);
+    document.getElementById('results-container').textContent = 
+      `Generated embedding with ${embedding.length} dimensions`;
+    
+  } catch (error) {
+    console.error('Embedding failed:', error);
+    alert('Failed to generate embedding. Check console for details.');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Search';
+  }
+});
+</script>
+
 <style>
 .search-container {
   margin: 2rem 0;
