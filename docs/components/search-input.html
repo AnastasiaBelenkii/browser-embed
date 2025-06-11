@@ -2,12 +2,13 @@
   <input type="text" 
          id="search-input" 
          placeholder="Enter search query..."
-         aria-label="Semantic search query">
+         aria-label="Semantic search query"
+         onkeydown="if(event.key === 'Enter') document.getElementById('search-button').click()">
   <button id="search-button">Search</button>
 </div>
 
 <script>
-document.getElementById('search-button').addEventListener('click', async function() {
+async function handleSearch() {
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
 
@@ -40,7 +41,9 @@ document.getElementById('search-button').addEventListener('click', async functio
     button.disabled = false;
     button.textContent = 'Search';
   }
-});
+}
+
+document.getElementById('search-button').addEventListener('click', handleSearch);
 </script>
 
 <style>
