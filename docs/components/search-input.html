@@ -8,16 +8,26 @@
 </div>
 
 <script>
-async function handleSearch() {
-  if (!this._pipeline) {
-    this._pipeline = await transformers.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-  }
-  const query = document.getElementById('search-input').value.trim();
-  if (!query) return;
+let _pipeline = null;
 
-  const button = this;
-  button.disabled = true;
-  button.textContent = 'Processing...';
+async function handleSearch() {
+  try {
+    console.log('Search button clicked'); // Debug log
+    if (!_pipeline) {
+      console.log('Initializing pipeline...'); // Debug log
+      _pipeline = await window.transformers.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+      console.log('Pipeline initialized'); // Debug log
+    }
+    
+    const query = document.getElementById('search-input').value.trim();
+    if (!query) {
+      console.log('Empty query'); // Debug log
+      return;
+    }
+
+    const button = document.getElementById('search-button');
+    button.disabled = true;
+    button.textContent = 'Processing...';
 
   try {
     // Generate embedding using cached pipeline
@@ -53,7 +63,10 @@ async function handleSearch() {
   }
 }
 
-document.getElementById('search-button').addEventListener('click', handleSearch);
+document.getElementById('search-button').addEventListener('click', (e) => {
+  e.preventDefault();
+  handleSearch().catch(console.error);
+});
 </script>
 
 <style>
