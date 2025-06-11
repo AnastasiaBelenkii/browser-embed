@@ -9,6 +9,16 @@
 
 <script>
 async function handleSearch() {
+  // Ensure transformers is loaded - may take a moment on first load
+  if (typeof transformers === 'undefined') {
+    await new Promise(resolve => {
+      const check = () => {
+        if (typeof transformers !== 'undefined') return resolve();
+        setTimeout(check, 100);
+      };
+      check();
+    });
+  }
   const query = document.getElementById('search-input').value.trim();
   if (!query) return;
 
