@@ -27,14 +27,11 @@ async function handleSearch() {
   button.textContent = 'Processing...';
 
   try {
-    // Load the embedding pipeline
-    const pipeline = await transformers.pipeline(
+    // Generate embedding using the already imported pipeline
+    const output = await transformers.pipeline(
       'feature-extraction',
       'Xenova/all-MiniLM-L6-v2'
-    );
-    
-    // Generate embedding
-    const output = await pipeline(query, {
+    )(query, {
       pooling: 'mean',
       normalize: true
     });
