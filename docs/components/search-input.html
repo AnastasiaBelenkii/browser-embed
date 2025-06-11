@@ -47,11 +47,13 @@ async function handleSearch() {
         Max: ${Math.max(...embedding).toFixed(4)},
         Avg: ${(embedding.reduce((a,b) => a + b, 0)/embedding.length).toFixed(4)}
       </div>
+      <pre class="debug">${JSON.stringify({query, embedding: embedding.slice(0,5)}, null, 2)}</pre>
     `;
     
   } catch (error) {
     console.error('Embedding failed:', error);
-    alert('Failed to generate embedding. Check console for details.');
+    document.getElementById('results-container').innerHTML = 
+      `<div class="error">Failed to generate embedding: ${error.message}</div>`;
   } finally {
     button.disabled = false;
     button.textContent = 'Search';
