@@ -1,9 +1,10 @@
 <div class="search-container">
-  <input type="text" 
-         id="search-input" 
-         placeholder="Enter search query..."
-         aria-label="Semantic search query"
-         onkeydown="if(event.key === 'Enter') document.getElementById('search-button').click()">
+  <input
+    type="text"
+    id="search-input"
+    placeholder="Enter search query..."
+    aria-label="Semantic search query"
+  />
   <button id="search-button">Search</button>
 </div>
 
@@ -11,61 +12,83 @@
 let _pipeline = null;
 
 async function handleSearch() {
+  console.log('Search button clicked');
   try {
-    console.log('Search button clicked'); // Debug log
+    // Lazily initialise the pipeline once
     if (!_pipeline) {
-      console.log('Initializing pipeline...'); // Debug log
-      _pipeline = await window.transformers.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-      console.log('Pipeline initialized'); // Debug log
+      console.log('Initializing pipeline…');
+      _pipeline = await window.transformers.pipeline(
+        'feature-extraction',
+        'Xenova/all-MiniLM-L6-v2'
+      );
+      console.log('Pipeline initialized');
     }
-    
+
     const query = document.getElementById('search-input').value.trim();
     if (!query) {
-      console.log('Empty query'); // Debug log
+      console.log('Empty query');
       return;
     }
 
     const button = document.getElementById('search-button');
     button.disabled = true;
-    button.textContent = 'Processing...';
+    button.textContent = 'Processing…';
 
-  try {
     // Generate embedding using cached pipeline
-    const output = await this._pipeline(query, {
+    const output = await _pipeline(query, {
       pooling: 'mean',
       normalize: true,
       progress_callback: (progress) => {
-        console.log(`Progress: ${Math.round(progress.loaded/progress.total * 100)}%`);
-      }
+        console.log(
+          `Progress: ${Math.round((progress.loaded / progress.total) * 100)}%`
+        );
+      },
     });
-    
+
     // Convert to array and display formatted results
     const embedding = Array.from(output.data);
     const resultsDiv = document.getElementById('results-container');
     resultsDiv.innerHTML = `
       <h3>Generated embedding (${embedding.length} dimensions):</h3>
-      <div class="embedding-values">${embedding.slice(0,10).map(v => v.toFixed(4)).join(', ')}...</div>
+      <div class="embedding-values">
+        ${embedding.slice(0, 10).map((v) => v.toFixed(4)).join(', ')}...
+      </div>
       <div class="embedding-meta">
         Min: ${Math.min(...embedding).toFixed(4)}, 
         Max: ${Math.max(...embedding).toFixed(4)},
-        Avg: ${(embedding.reduce((a,b) => a + b, 0)/embedding.length).toFixed(4)}
+        Avg: ${(embedding.reduce((a, b) => a + b, 0) / embedding.length).toFixed(4)}
       </div>
-      <pre class="debug">${JSON.stringify({query, embedding: embedding.slice(0,5)}, null, 2)}</pre>
+      <pre class="debug">${JSON.stringify(
+        { query, embedding: embedding.slice(0, 5) },
+        null,
+        2
+      )}</pre>
     `;
-    
   } catch (error) {
     console.error('Embedding failed:', error);
-    document.getElementById('results-container').innerHTML = 
-      `<div class="error">Failed to generate embedding: ${error.message}</div>`;
+    document.getElementById('results-container').innerHTML = `
+      <div class="error">Failed to generate embedding: ${error.message}</div>
+    `;
   } finally {
-    button.disabled = false;
-    button.textContent = 'Search';
+    const button = document.getElementById('search-button');
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Search';
+    }
   }
 }
 
+// Attach event listeners once the component is in the DOM
 document.getElementById('search-button').addEventListener('click', (e) => {
   e.preventDefault();
   handleSearch().catch(console.error);
+});
+
+document.getElementById('search-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('search-button').click();
+  }
 });
 </script>
 
