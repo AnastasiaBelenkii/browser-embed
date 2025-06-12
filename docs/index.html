@@ -7,24 +7,11 @@
   <meta name="description" content="Client-side semantic search using embeddings" />
   <meta name="theme-color" content="#ffffff" />
   <title>In Browser Semantic Search</title>
-  <style>
-    code{white-space: pre-wrap;}
-    span.smallcaps{font-variant: small-caps;}
-    div.columns{display: flex; gap: min(4vw, 1.5em);}
-    div.column{flex: auto; overflow-x: auto;}
-    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
-    /* The extra [class] is a hack that increases specificity enough to
-       override a similar rule in reveal.js */
-    ul.task-list[class]{list-style: none;}
-    ul.task-list li input[type="checkbox"] {
-      font-size: inherit;
-      width: 0.8em;
-      margin: 0 0.8em 0.2em -1.6em;
-      vertical-align: middle;
-    }
-    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
-  </style>
   <link rel="stylesheet" href="style.css" />
+  <script type="module" src="js/transformers-init.js"></script>
+  <script>
+    console.log('Transformers initialized:', window.transformers);
+  </script>
 </head>
 <body>
 <header id="title-block-header">
@@ -34,6 +21,7 @@
 <article class="content">
   <section>
     <p>My attempt to wrap my head around embeddings and semantic search.</p>
+    <!-- Placeholder that will be replaced with the search component -->
     <div data-include="components/search-input.html"></div>
     <div id="results-container"></div>
   </section>
@@ -48,19 +36,15 @@ href="https://github.com/AnastasiaBelenkii/browser-embed" target="_blank" rel="n
 <p>Email me at anastasia@belenky.net with thoughts, feelings,
 unsolicited advice, and technical suggestions. Anything at all.
 Please.</p>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  const includes = document.querySelectorAll('[data-include]');
-  includes.forEach(async element => {
-    const file = element.getAttribute('data-include');
-    try {
-      const response = await fetch(file);
-      element.outerHTML = await response.text();
-    } catch (error) {
-      console.error('Error loading component:', error);
-    }
-  });
-});
+<script type="module">
+  import { loadComponents } from './js/component-loader.js';
+
+  // Load components when the DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadComponents);
+  } else {
+    loadComponents();
+  }
 </script>
 </body>
 </html>
