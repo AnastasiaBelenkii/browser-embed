@@ -130,8 +130,8 @@ async function runStepByStep(query) {
 
     // 1. Tokenization
     const tokens = tokenizer(query, { padding: true, truncation: true });
-    // Explicitly convert token IDs back to string tokens for display
-    const stringTokens = tokenizer.convert_ids_to_tokens(tokens.input_ids.data);
+    // FIX: Use the tokenizer's vocab to look up token strings by their IDs.
+    const stringTokens = Array.from(tokens.input_ids.data).map(id => tokenizer.vocab[id]);
     
     renderStep(stepsDiv, '1. Tokenize', `
         <p>The input text is converted into tokens the model can understand.</p>
