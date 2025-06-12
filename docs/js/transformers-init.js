@@ -1,4 +1,4 @@
-import { env, pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.5.0/dist/transformers.min.js';
+import { env, pipeline, AutoTokenizer, AutoModel } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.5.0/dist/transformers.min.js';
 
 // Configuration
 const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
@@ -9,22 +9,39 @@ env.allowLocalModels = false; // Force use of remote models
 env.backends.onnx.wasm.numThreads = 1; // Recommended for browser
 
 /**
- * Initializes the feature-extraction pipeline.
- * This function is called once and the promise is cached.
- * It dispatches events to notify the UI about the loading status.
+ * Initializes the pipeline, tokenizer, and model.
+ * This function is called once and dispatches events to notify the UI.
  */
-async function initializePipeline() {
+async function initialize() {
     try {
-        console.log('Starting model loading...');
-        const pipe = await pipeline(TASK, MODEL_NAME);
-        console.log('Model loaded successfully!');
-        // Dispatch the event with the pipeline instance in the detail
-        document.dispatchEvent(new CustomEvent('model-ready', { detail: { pipeline: pipe } }));
+        console.log('Starting model and tokenizer loading...');
+        
+        // Load the tokenizer and model separately for step-by-step visualization
+        const tokenizer = await AutoTokenizer.from_pretrained(MODEL_NAME);
+        const model = await AutoModel.from_pretrained(MODEL_NAME);
+        
+        // Create a pipeline for convenience, reusing the loaded model and tokenizer
+        const pipe = await pipeline(TASK, MODEL_NAME, {
+            tokenizer,
+            model,
+        });
+
+        console.log('Model, tokenizer, and pipeline loaded successfully!');
+        
+        // Dispatch the event with all necessary components
+        document.dispatchEvent(new CustomEvent('model-ready', { 
+            detail: { 
+                pipeline: pipe,
+                tokenizer: tokenizer,
+                model: model,
+            } 
+        }));
+
     } catch (error) {
         console.error('Failed to load model:', error);
         document.dispatchEvent(new CustomEvent('model-error', { detail: error }));
     }
 }
 
-// Start loading the model as soon as the script is loaded.
-initializePipeline();
+// Start loading as soon as the script is loaded.
+initialize();

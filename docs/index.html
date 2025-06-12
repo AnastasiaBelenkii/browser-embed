@@ -9,9 +9,6 @@
   <title>In Browser Semantic Search</title>
   <link rel="stylesheet" href="style.css" />
   <script type="module" src="js/transformers-init.js"></script>
-  <script>
-    console.log('Transformers initialized:', window.transformers);
-  </script>
 </head>
 <body>
 <header id="title-block-header">
@@ -24,6 +21,7 @@
     <!-- Placeholder that will be replaced with the search component -->
     <div data-include="components/search-input.html"></div>
     <div id="results-container"></div>
+    <div id="step-by-step-container"></div>
   </section>
   
   <section>

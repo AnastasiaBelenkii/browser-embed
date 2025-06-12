@@ -10,9 +10,13 @@
   <div id="spinner" class="spinner"></div>
 </div>
 
-<script>
+<script type="module">
+import { Tensor } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.5.0/dist/transformers.min.js';
+
 // Module-level state
 let pipeline = null;
+let tokenizer = null;
+let model = null;
 
 // --- UI Management ---
 
@@ -21,13 +25,14 @@ function getDOMElements() {
     const input = document.getElementById('search-input');
     const spinner = document.getElementById('spinner');
     const resultsDiv = document.getElementById('results-container');
-    if (!button || !input || !spinner || !resultsDiv) {
-        throw new Error("Search component UI elements not found.");
+    const stepsDiv = document.getElementById('step-by-step-container');
+    if (!button || !input || !spinner || !resultsDiv || !stepsDiv) {
+        throw new Error("Component UI elements not found.");
     }
-    return { button, input, spinner, resultsDiv };
+    return { button, input, spinner, resultsDiv, stepsDiv };
 }
 
-function setUIState(state, message = '') {
+function setUIState(state) {
     const { button, input, spinner } = getDOMElements();
     
     const states = {
@@ -67,6 +72,7 @@ function renderResults(embedding, query) {
     const { resultsDiv } = getDOMElements();
     const embeddingValues = Array.from(embedding.data);
     resultsDiv.innerHTML = `
+      <h2>Pipeline Result</h2>
       <h3>Generated embedding (${embeddingValues.length} dimensions):</h3>
       <div class="embedding-values">
         ${embeddingValues.slice(0, 10).map((v) => v.toFixed(4)).join(', ')}...
@@ -76,11 +82,6 @@ function renderResults(embedding, query) {
         Max: ${Math.max(...embeddingValues).toFixed(4)},
         Avg: ${(embeddingValues.reduce((a, b) => a + b, 0) / embeddingValues.length).toFixed(4)}
       </div>
-      <pre class="debug">${JSON.stringify(
-        { query, embedding: embeddingValues.slice(0, 5) },
-        null,
-        2
-      )}</pre>
     `;
 }
 
@@ -89,16 +90,77 @@ function renderError(error) {
     resultsDiv.innerHTML = `<div class="error">Failed to generate embedding: ${error.message}</div>`;
 }
 
+function renderStep(container, title, content) {
+    container.innerHTML += `
+        <div class="step">
+            <h4>${title}</h4>
+            <div class="step-content">${content}</div>
+        </div>
+    `;
+}
+
+// --- Manual Embedding Logic ---
+
+function meanPooling(last_hidden_state, attention_mask) {
+    let pooled = last_hidden_state.mul(attention_mask.unsqueeze(-1)).sum(1);
+    let sum = attention_mask.sum(1).unsqueeze(-1);
+    return pooled.div(sum);
+}
+
+function normalize(tensor, p = 2.0, dim = 1) {
+    const norm = tensor.norm(p, dim, true);
+    return tensor.div(norm);
+}
+
+async function runStepByStep(query) {
+    const { stepsDiv } = getDOMElements();
+    stepsDiv.innerHTML = '<h2>Step-by-Step Breakdown</h2>';
+
+    // 1. Tokenization
+    const tokens = tokenizer(query, { padding: true, truncation: true });
+    renderStep(stepsDiv, '1. Tokenize', `
+        <p>The input text is converted into tokens the model can understand.</p>
+        <pre>${JSON.stringify(tokens.tokens, null, 2)}</pre>
+        <p>These tokens are then mapped to integer IDs from the model's vocabulary:</p>
+        <pre>${JSON.stringify(tokens.input_ids, null, 2)}</pre>
+    `);
+
+    // 2. Model Forward Pass
+    const modelOutput = await model(tokens);
+    renderStep(stepsDiv, '2. Model Pass (Get Last Hidden State)', `
+        <p>The token IDs are fed through the transformer model. The output is a vector for each input token, now aware of its context.</p>
+        <p>Shape: [batch_size, num_tokens, embedding_dim] = [${modelOutput.last_hidden_state.dims.join(', ')}]</p>
+        <pre>${modelOutput.last_hidden_state.data.slice(0, 5).map(v => v.toFixed(4)).join(', ')}...</pre>
+    `);
+
+    // 3. Pooling
+    const pooled = meanPooling(modelOutput.last_hidden_state, tokens.attention_mask);
+    renderStep(stepsDiv, '3. Mean Pooling', `
+        <p>To get a single vector for the whole sentence, we average the vectors of all the tokens (ignoring padding tokens).</p>
+        <p>Shape: [${pooled.dims.join(', ')}]</p>
+        <pre>${Array.from(pooled.data).slice(0, 10).map(v => v.toFixed(4)).join(', ')}...</pre>
+    `);
+
+    // 4. Normalization
+    const normalizedVector = normalize(pooled);
+    renderStep(stepsDiv, '4. Normalization', `
+        <p>The pooled vector is normalized to have a length of 1. This is crucial for accurate similarity calculations later.</p>
+        <p>Shape: [${normalizedVector.dims.join(', ')}]</p>
+        <pre>${Array.from(normalizedVector.data).slice(0, 10).map(v => v.toFixed(4)).join(', ')}...</pre>
+        <p><strong>This final vector is the sentence embedding!</strong></p>
+    `);
+}
+
 
 // --- Core Logic ---
 
 async function handleSearch() {
   console.log('Search button clicked');
-  const { input, resultsDiv } = getDOMElements();
+  const { input, resultsDiv, stepsDiv } = getDOMElements();
 
   try {
-    if (!pipeline) {
-      throw new Error('Pipeline not available.');
+    if (!pipeline || !tokenizer || !model) {
+      throw new Error('Pipeline, tokenizer, or model not available.');
     }
 
     const query = input.value.trim();
@@ -109,13 +171,15 @@ async function handleSearch() {
 
     setUIState('generating');
     resultsDiv.innerHTML = 'Generating embedding...';
+    stepsDiv.innerHTML = ''; // Clear previous steps
 
-    const output = await pipeline(query, {
-      pooling: 'mean',
-      normalize: true,
-    });
+    // Run both the simple pipeline and the step-by-step process
+    const [pipelineOutput, _] = await Promise.all([
+        pipeline(query, { pooling: 'mean', normalize: true }),
+        runStepByStep(query)
+    ]);
 
-    renderResults(output, query);
+    renderResults(pipelineOutput, query);
 
   } catch (error) {
     console.error('Embedding failed:', error);
@@ -135,7 +199,9 @@ function setupSearchComponent() {
 
     document.addEventListener('model-ready', (event) => {
         console.log('Model is ready, enabling search UI.');
-        pipeline = event.detail.pipeline; // Get pipeline from event
+        pipeline = event.detail.pipeline;
+        tokenizer = event.detail.tokenizer;
+        model = event.detail.model;
         setUIState('ready');
     });
 
@@ -206,7 +272,7 @@ try {
 }
 
 /* Styles for the results container, colocated with the component that populates it */
-#results-container {
+#results-container, #step-by-step-container {
   margin-top: 1rem;
   padding: 1rem;
   border: 1px solid #ccc;
@@ -218,7 +284,12 @@ try {
   word-wrap: break-word;
 }
 
-#results-container h3 {
+#results-container h2, #step-by-step-container h2 {
+    margin-top: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+#results-container h3, #step-by-step-container h4 {
   margin-top: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
 }
@@ -229,7 +300,23 @@ try {
   color: #6c757d;
 }
 
-#results-container pre.debug {
+#step-by-step-container .step {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px dashed #ccc;
+}
+#step-by-step-container .step:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+#step-by-step-container .step-content p {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    font-size: 1rem;
+    margin: 0.5rem 0;
+}
+
+#results-container pre, #step-by-step-container pre {
   background: #e9ecef;
   padding: 0.5rem;
   border-radius: 4px;
@@ -243,7 +330,7 @@ try {
 
 /* Dark mode adjustments for results container */
 @media (prefers-color-scheme: dark) {
-  #results-container {
+  #results-container, #step-by-step-container {
     background: #161b22;
     border-color: #30363d;
     color: #c9d1d9; /* Use the body's dark mode text color */
@@ -253,7 +340,11 @@ try {
     color: #8b949e;
   }
 
-  #results-container pre.debug {
+  #step-by-step-container .step {
+      border-color: #30363d;
+  }
+
+  #results-container pre, #step-by-step-container pre {
     background: #0d1117;
   }
 }
