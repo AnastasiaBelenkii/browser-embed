@@ -116,16 +116,22 @@ async function runStepByStep(query) {
     const { stepsDiv } = getDOMElements();
     stepsDiv.innerHTML = '<h2>Step-by-Step Breakdown</h2>';
 
+    // A "replacer" function for JSON.stringify to handle BigInts
+    const jsonReplacer = (key, value) => {
+        if (typeof value === 'bigint') {
+            return Number(value); // Convert BigInt to a regular number
+        }
+        return value;
+    };
+
     // 1. Tokenization
     const tokens = tokenizer(query, { padding: true, truncation: true });
-    // Convert BigInts to Numbers for JSON serialization
-    const inputIdsAsNumbers = Array.from(tokens.input_ids.data).map(id => Number(id));
-
+    
     renderStep(stepsDiv, '1. Tokenize', `
         <p>The input text is converted into tokens the model can understand.</p>
         <pre>${JSON.stringify(tokens.tokens, null, 2)}</pre>
         <p>These tokens are then mapped to integer IDs from the model's vocabulary:</p>
-        <pre>${JSON.stringify(inputIdsAsNumbers, null, 2)}</pre>
+        <pre>${JSON.stringify(tokens.input_ids.data, jsonReplacer, 2)}</pre>
     `);
 
     // 2. Model Forward Pass
