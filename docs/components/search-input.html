@@ -102,6 +102,10 @@ function renderStep(container, title, content) {
 // --- Manual Embedding Logic ---
 
 function meanPooling(last_hidden_state, attention_mask) {
+    // Add a guard clause to ensure the input is a Tensor, providing a clear error if not.
+    if (!(last_hidden_state instanceof Tensor)) {
+        throw new Error(`Invalid input: last_hidden_state is not a Tensor. It is of type ${typeof last_hidden_state}. This can happen if the model's forward pass did not execute as expected.`);
+    }
     let pooled = last_hidden_state.mul(attention_mask.unsqueeze(-1)).sum(1);
     let sum = attention_mask.sum(1).unsqueeze(-1);
     return pooled.div(sum);
@@ -126,10 +130,12 @@ async function runStepByStep(query) {
 
     // 1. Tokenization
     const tokens = tokenizer(query, { padding: true, truncation: true });
+    // Explicitly convert token IDs back to string tokens for display
+    const stringTokens = tokenizer.convert_ids_to_tokens(tokens.input_ids.data);
     
     renderStep(stepsDiv, '1. Tokenize', `
         <p>The input text is converted into tokens the model can understand.</p>
-        <pre>${JSON.stringify(tokens.tokens, null, 2)}</pre>
+        <pre>${JSON.stringify(stringTokens, null, 2)}</pre>
         <p>These tokens are then mapped to integer IDs from the model's vocabulary:</p>
         <pre>${JSON.stringify(tokens.input_ids.data, jsonReplacer, 2)}</pre>
     `);
