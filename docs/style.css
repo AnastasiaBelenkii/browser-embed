@@ -12,6 +12,25 @@ h1,h2,h3 {
     line-height: 1.2
 }
 
+/* General-purpose spinner */
+.spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border-left-color: #444; /* Match default text color */
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Utility class to hide elements */
+.hidden {
+    display: none;
+}
+
 @media (prefers-color-scheme: dark) {
     body {
         color:#c9d1d9;
@@ -24,5 +43,10 @@ h1,h2,h3 {
 
     a:visited {
         color: #8e96f0
+    }
+
+    /* Adjust spinner color for dark mode */
+    .spinner {
+        border-left-color: #58a6ff;
     }
 }

@@ -7,17 +7,96 @@
     disabled
   />
   <button id="search-button" disabled>Search</button>
+  <div id="spinner" class="spinner"></div>
 </div>
 
 <script>
+// Module-level state
+let pipeline = null;
+
+// --- UI Management ---
+
+function getDOMElements() {
+    const button = document.getElementById('search-button');
+    const input = document.getElementById('search-input');
+    const spinner = document.getElementById('spinner');
+    const resultsDiv = document.getElementById('results-container');
+    if (!button || !input || !spinner || !resultsDiv) {
+        throw new Error("Search component UI elements not found.");
+    }
+    return { button, input, spinner, resultsDiv };
+}
+
+function setUIState(state, message = '') {
+    const { button, input, spinner } = getDOMElements();
+    
+    const states = {
+        loadingModel: () => {
+            input.disabled = true;
+            button.disabled = true;
+            input.placeholder = 'Loading model...';
+            spinner.classList.remove('hidden');
+        },
+        ready: () => {
+            input.disabled = false;
+            button.disabled = false;
+            input.placeholder = 'Enter search query...';
+            spinner.classList.add('hidden');
+        },
+        generating: () => {
+            input.disabled = true;
+            button.disabled = true;
+            button.textContent = 'Generating...';
+            spinner.classList.remove('hidden');
+        },
+        error: () => {
+            input.disabled = true;
+            button.disabled = true;
+            input.placeholder = 'An error occurred.';
+            button.textContent = 'Error';
+            spinner.classList.add('hidden');
+        }
+    };
+
+    if (states[state]) {
+        states[state]();
+    }
+}
+
+function renderResults(embedding, query) {
+    const { resultsDiv } = getDOMElements();
+    const embeddingValues = Array.from(embedding.data);
+    resultsDiv.innerHTML = `
+      <h3>Generated embedding (${embeddingValues.length} dimensions):</h3>
+      <div class="embedding-values">
+        ${embeddingValues.slice(0, 10).map((v) => v.toFixed(4)).join(', ')}...
+      </div>
+      <div class="embedding-meta">
+        Min: ${Math.min(...embeddingValues).toFixed(4)}, 
+        Max: ${Math.max(...embeddingValues).toFixed(4)},
+        Avg: ${(embeddingValues.reduce((a, b) => a + b, 0) / embeddingValues.length).toFixed(4)}
+      </div>
+      <pre class="debug">${JSON.stringify(
+        { query, embedding: embeddingValues.slice(0, 5) },
+        null,
+        2
+      )}</pre>
+    `;
+}
+
+function renderError(error) {
+    const { resultsDiv } = getDOMElements();
+    resultsDiv.innerHTML = `<div class="error">Failed to generate embedding: ${error.message}</div>`;
+}
+
+
+// --- Core Logic ---
+
 async function handleSearch() {
   console.log('Search button clicked');
-  const button = document.getElementById('search-button');
-  const input = document.getElementById('search-input');
-  const resultsDiv = document.getElementById('results-container');
+  const { input, resultsDiv } = getDOMElements();
 
   try {
-    const pipeline = await window.transformers.getPipeline();
     if (!pipeline) {
       throw new Error('Pipeline not available.');
     }
@@ -28,70 +107,41 @@ async function handleSearch() {
       return;
     }
 
-    button.disabled = true;
-    button.textContent = 'Generating...';
+    setUIState('generating');
     resultsDiv.innerHTML = 'Generating embedding...';
 
-    // Generate embedding using the pipeline
     const output = await pipeline(query, {
       pooling: 'mean',
       normalize: true,
     });
 
-    // Convert to array and display formatted results
-    const embedding = Array.from(output.data);
-    resultsDiv.innerHTML = `
-      <h3>Generated embedding (${embedding.length} dimensions):</h3>
-      <div class="embedding-values">
-        ${embedding.slice(0, 10).map((v) => v.toFixed(4)).join(', ')}...
-      </div>
-      <div class="embedding-meta">
-        Min: ${Math.min(...embedding).toFixed(4)}, 
-        Max: ${Math.max(...embedding).toFixed(4)},
-        Avg: ${(embedding.reduce((a, b) => a + b, 0) / embedding.length).toFixed(4)}
-      </div>
-      <pre class="debug">${JSON.stringify(
-        { query, embedding: embedding.slice(0, 5) },
-        null,
-        2
-      )}</pre>
-    `;
+    renderResults(output, query);
+
   } catch (error) {
     console.error('Embedding failed:', error);
-    resultsDiv.innerHTML = `
-      <div class="error">Failed to generate embedding: ${error.message}</div>
-    `;
+    renderError(error);
   } finally {
-    if (button) {
-      button.disabled = false;
-      button.textContent = 'Search';
-    }
+    setUIState('ready');
+    const { button } = getDOMElements();
+    button.textContent = 'Search';
   }
 }
 
+
+// --- Component Initialization ---
+
 function setupSearchComponent() {
-    const button = document.getElementById('search-button');
-    const input = document.getElementById('search-input');
+    const { button, input } = getDOMElements();
 
-    if (!button || !input) {
-        throw new Error("Search component setup failed: Could not find required elements (#search-button, #search-input).");
-    }
-
-    // Listen for the model-ready event to enable the UI
-    document.addEventListener('model-ready', () => {
+    document.addEventListener('model-ready', (event) => {
         console.log('Model is ready, enabling search UI.');
-        input.disabled = false;
-        button.disabled = false;
-        input.placeholder = 'Enter search query...';
+        pipeline = event.detail.pipeline; // Get pipeline from event
+        setUIState('ready');
     });
 
-    // Listen for model loading errors
     document.addEventListener('model-error', (event) => {
         console.error('Model loading failed, updating UI.', event.detail);
-        input.placeholder = 'Model failed to load.';
-        input.disabled = true;
-        button.disabled = true;
-        button.textContent = 'Error';
+        setUIState('error');
     });
 
     button.addEventListener('click', (e) => {
@@ -107,8 +157,6 @@ function setupSearchComponent() {
     });
 }
 
-// The component's script is executed after it's inserted into the DOM.
-// We wrap the setup in a try-catch to handle initialization errors gracefully.
 try {
     setupSearchComponent();
 } catch (error) {
@@ -125,6 +173,7 @@ try {
   margin: 2rem 0;
   display: flex;
   gap: 0.5rem;
+  align-items: center;
 }
 
 #search-input {
@@ -143,6 +192,8 @@ try {
   border-radius: 4px;
   cursor: pointer;
   font-size: 1rem;
+  /* Ensure button height is consistent */
+  height: 42px;
 }
 
 #search-button:hover:not(:disabled) {
