@@ -120,4 +120,57 @@ document.getElementById('search-input').addEventListener('keydown', (e) => {
 #search-button:hover {
   background: #0069d9;
 }
+
+/* Styles for the results container, colocated with the component that populates it */
+#results-container {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #f8f9fa;
+  color: #212529; /* Default text color for light background */
+  font-family: monospace;
+  font-size: 0.875rem;
+  word-wrap: break-word;
+}
+
+#results-container h3 {
+  margin-top: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+#results-container .embedding-meta {
+  margin: 0.5rem 0;
+  font-style: italic;
+  color: #6c757d;
+}
+
+#results-container pre.debug {
+  background: #e9ecef;
+  padding: 0.5rem;
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+
+#results-container .error {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+/* Dark mode adjustments for results container */
+@media (prefers-color-scheme: dark) {
+  #results-container {
+    background: #161b22;
+    border-color: #30363d;
+    color: #c9d1d9; /* Use the body's dark mode text color */
+  }
+
+  #results-container .embedding-meta {
+    color: #8b949e;
+  }
+
+  #results-container pre.debug {
+    background: #0d1117;
+  }
+}
 </style>
