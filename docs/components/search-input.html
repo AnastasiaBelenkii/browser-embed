@@ -73,6 +73,10 @@ function setupSearchComponent() {
     const button = document.getElementById('search-button');
     const input = document.getElementById('search-input');
 
+    if (!button || !input) {
+        throw new Error("Search component setup failed: Could not find required elements (#search-button, #search-input).");
+    }
+
     // Listen for the model-ready event to enable the UI
     document.addEventListener('model-ready', () => {
         console.log('Model is ready, enabling search UI.');
@@ -104,8 +108,16 @@ function setupSearchComponent() {
 }
 
 // The component's script is executed after it's inserted into the DOM.
-// We can safely attach listeners now.
-setupSearchComponent();
+// We wrap the setup in a try-catch to handle initialization errors gracefully.
+try {
+    setupSearchComponent();
+} catch (error) {
+    console.error('Failed to initialize search component:', error);
+    const container = document.querySelector('.search-container');
+    if (container) {
+        container.innerHTML = `<div class="error" style="width: 100%; text-align: center;">Error: Search component failed to load.</div>`;
+    }
+}
 </script>
 
 <style>
