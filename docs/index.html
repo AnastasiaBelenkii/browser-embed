@@ -36,45 +36,15 @@ href="https://github.com/AnastasiaBelenkii/browser-embed" target="_blank" rel="n
 <p>Email me at anastasia@belenky.net with thoughts, feelings,
 unsolicited advice, and technical suggestions. Anything at all.
 Please.</p>
-<script>
-// Simple component loader that also executes <script> tags inside the fetched HTML.
-document.addEventListener('DOMContentLoaded', () => {
-  const includes = document.querySelectorAll('[data-include]');
+<script type="module">
+  import { loadComponents } from './js/component-loader.js';
 
-  includes.forEach(async (placeholder) => {
-    const file = placeholder.getAttribute('data-include');
-    try {
-      const response = await fetch(file);
-      const html = await response.text();
-
-      // Parse the fetched HTML into a template so we can work with the DOM nodes
-      const template = document.createElement('template');
-      template.innerHTML = html.trim();
-
-      // Execute any <script> tags by cloning them into real script elements
-      const scripts = template.content.querySelectorAll('script');
-      scripts.forEach((oldScript) => {
-        const newScript = document.createElement('script');
-
-        // Copy attributes such as type or module
-        [...oldScript.attributes].forEach((attr) =>
-          newScript.setAttribute(attr.name, attr.value)
-        );
-
-        // Copy inline code
-        newScript.textContent = oldScript.textContent;
-
-        // Replace the old (inert) script with the live one
-        oldScript.parentNode.replaceChild(newScript, oldScript);
-      });
-
-      // Replace the placeholder with the fully-hydrated component
-      placeholder.replaceWith(template.content);
-    } catch (error) {
-      console.error('Error loading component:', error);
-    }
-  });
-});
+  // Load components when the DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadComponents);
+  } else {
+    loadComponents();
+  }
 </script>
 </body>
 </html>
