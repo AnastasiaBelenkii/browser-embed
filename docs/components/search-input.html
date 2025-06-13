@@ -130,8 +130,8 @@ async function runStepByStep(query) {
 
     // 1. Tokenization
     const tokens = tokenizer(query, { padding: true, truncation: true });
-    // FIX: Use the tokenizer attached to the pipeline object for a more reliable reference.
-    const stringTokens = Array.from(tokens.input_ids.data).map(id => pipeline.tokenizer.vocab[id]);
+    // FIX: Use the tokenizer's `decode` method on each individual token ID.
+    const stringTokens = Array.from(tokens.input_ids.data).map(id => tokenizer.decode([id]));
     
     renderStep(stepsDiv, '1. Tokenize', `
         <p>The input text is converted into tokens the model can understand.</p>
