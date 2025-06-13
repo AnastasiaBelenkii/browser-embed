@@ -101,14 +101,42 @@ function renderStep(container, title, content) {
 
 // --- Manual Embedding Logic ---
 
+/**
+ * Performs mean pooling on the last hidden state using plain JavaScript to avoid Tensor API issues.
+ * @param {Tensor} last_hidden_state The model's last hidden state.
+ * @param {Tensor} attention_mask The model's attention mask.
+ * @returns {Tensor} The pooled embedding.
+ */
 function meanPooling(last_hidden_state, attention_mask) {
-    // Add a guard clause to ensure the input is a Tensor, providing a clear error if not.
-    if (!(last_hidden_state instanceof Tensor)) {
-        throw new Error(`Invalid input: last_hidden_state is not a Tensor. It is of type ${typeof last_hidden_state}. This can happen if the model's forward pass did not execute as expected.`);
+    const hiddenStateData = last_hidden_state.data;
+    const attentionMaskData = attention_mask.data;
+    
+    const hiddenSize = last_hidden_state.dims[2];
+    const numTokens = last_hidden_state.dims[1];
+
+    // Create a new array to store the sum of the embeddings
+    const pooled = new Float32Array(hiddenSize).fill(0);
+    let num_tokens_to_pool = 0;
+
+    // Iterate over each token
+    for (let i = 0; i < numTokens; ++i) {
+        // Check if the token is not a padding token (attention_mask === 1)
+        if (attentionMaskData[i] === 1) {
+            // Add the token's embedding to the pooled embedding
+            for (let j = 0; j < hiddenSize; ++j) {
+                pooled[j] += hiddenStateData[i * hiddenSize + j];
+            }
+            num_tokens_to_pool++;
+        }
     }
-    let pooled = last_hidden_state.mul(attention_mask.unsqueeze(-1)).sum(1);
-    let sum = attention_mask.sum(1).unsqueeze(-1);
-    return pooled.div(sum);
+
+    // Divide the summed embeddings by the number of non-padding tokens to get the mean
+    for (let j = 0; j < hiddenSize; ++j) {
+        pooled[j] /= num_tokens_to_pool;
+    }
+
+    // Return the result as a new Tensor
+    return new Tensor('float32', pooled, [1, hiddenSize]);
 }
 
 function normalize(tensor, p = 2.0, dim = 1) {
@@ -188,7 +216,7 @@ async function handleSearch() {
     resultsDiv.innerHTML = 'Generating embedding...';
     stepsDiv.innerHTML = ''; // Clear previous steps
 
-    // FIX: Run the pipeline and step-by-step process sequentially to avoid a likely race condition.
+    // Run the pipeline and step-by-step process sequentially to avoid a likely race condition.
     const pipelineOutput = await pipeline(query, { pooling: 'mean', normalize: true });
     await runStepByStep(query);
 
