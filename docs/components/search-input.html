@@ -130,7 +130,7 @@ async function runStepByStep(query) {
 
     // 1. Tokenization
     const tokens = tokenizer(query, { padding: true, truncation: true });
-    // FIX: Use the tokenizer's `decode` method on each individual token ID.
+    // Use the tokenizer's `decode` method on each individual token ID.
     const stringTokens = Array.from(tokens.input_ids.data).map(id => tokenizer.decode([id]));
     
     renderStep(stepsDiv, '1. Tokenize', `
@@ -188,11 +188,9 @@ async function handleSearch() {
     resultsDiv.innerHTML = 'Generating embedding...';
     stepsDiv.innerHTML = ''; // Clear previous steps
 
-    // Run both the simple pipeline and the step-by-step process
-    const [pipelineOutput, _] = await Promise.all([
-        pipeline(query, { pooling: 'mean', normalize: true }),
-        runStepByStep(query)
-    ]);
+    // FIX: Run the pipeline and step-by-step process sequentially to avoid a likely race condition.
+    const pipelineOutput = await pipeline(query, { pooling: 'mean', normalize: true });
+    await runStepByStep(query);
 
     renderResults(pipelineOutput, query);
 
