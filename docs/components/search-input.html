@@ -139,9 +139,30 @@ function meanPooling(last_hidden_state, attention_mask) {
     return new Tensor('float32', pooled, [1, hiddenSize]);
 }
 
-function normalize(tensor, p = 2.0, dim = 1) {
-    const norm = tensor.norm(p, dim, true);
-    return tensor.div(norm);
+/**
+ * Normalizes a tensor using plain JavaScript.
+ * @param {Tensor} tensor The tensor to normalize.
+ * @returns {Tensor} The normalized tensor.
+ */
+function normalize(tensor) {
+    const data = tensor.data;
+    const size = tensor.dims[1];
+
+    // Calculate L2 norm (Euclidean length)
+    let norm = 0;
+    for (let i = 0; i < size; ++i) {
+        norm += data[i] * data[i];
+    }
+    norm = Math.sqrt(norm);
+
+    // Create a new array for the normalized data
+    const normalizedData = new Float32Array(size);
+    for (let i = 0; i < size; ++i) {
+        normalizedData[i] = data[i] / norm;
+    }
+
+    // Return the result as a new Tensor
+    return new Tensor('float32', normalizedData, tensor.dims);
 }
 
 async function runStepByStep(query) {
