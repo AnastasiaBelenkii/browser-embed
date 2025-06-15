@@ -140,7 +140,8 @@ function meanPooling(last_hidden_state, attention_mask) {
 }
 
 /**
- * Normalizes a tensor using plain JavaScript.
+ * Normalizes a tensor using plain JavaScript. This function does not use any
+ * special Tensor math APIs like .div() or .norm() which may not exist.
  * @param {Tensor} tensor The tensor to normalize.
  * @returns {Tensor} The normalized tensor.
  */
@@ -148,7 +149,7 @@ function normalize(tensor) {
     const data = tensor.data;
     const size = tensor.dims[1];
 
-    // Calculate L2 norm (Euclidean length)
+    // Calculate L2 norm (Euclidean length) of the vector
     let norm = 0;
     for (let i = 0; i < size; ++i) {
         norm += data[i] * data[i];
@@ -158,6 +159,7 @@ function normalize(tensor) {
     // Create a new array for the normalized data
     const normalizedData = new Float32Array(size);
     for (let i = 0; i < size; ++i) {
+        // Divide each element by the norm
         normalizedData[i] = data[i] / norm;
     }
 
