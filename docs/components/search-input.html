@@ -38,10 +38,11 @@ function getDOMElements() {
     const input = document.getElementById('search-input');
     const spinner = document.getElementById('spinner');
     const corpusDiv = document.getElementById('corpus-container');
-    if (!button || !input || !spinner || !corpusDiv) {
+    const queryDiv = document.getElementById('query-container');
+    if (!button || !input || !spinner || !corpusDiv || !queryDiv) {
         throw new Error("Component UI elements not found.");
     }
-    return { button, input, spinner, corpusDiv };
+    return { button, input, spinner, corpusDiv, queryDiv };
 }
 
 function setUIState(state) {
@@ -97,11 +98,33 @@ function renderCorpus() {
                 <div class="corpus-text">${text}</div>
                 <div class="corpus-vector-preview">
                     [${vector.slice(0, 4).map(v => v.toFixed(2)).join(', ')}, ...]
+                    <button class="toggle-vector-btn" data-target="corpus-vector-full-${i}">Show Vector</button>
+                </div>
+                <div class="corpus-vector-full hidden" id="corpus-vector-full-${i}">
+                    [${vector.join(', ')}]
                 </div>
                 <div class="similarity-score" id="similarity-score-${i}"></div>
             </div>
         `;
     });
+}
+
+function renderQueryEmbedding(query, embedding) {
+    const { queryDiv } = getDOMElements();
+    const vector = embedding.data;
+    queryDiv.innerHTML = `
+        <h2>Your Query</h2>
+        <div class="query-item">
+            <div class="query-text">"${query}"</div>
+            <div class="corpus-vector-preview">
+                [${vector.slice(0, 4).map(v => v.toFixed(2)).join(', ')}, ...]
+                <button class="toggle-vector-btn" data-target="query-vector-full">Show Vector</button>
+            </div>
+            <div class="corpus-vector-full hidden" id="query-vector-full">
+                [${vector.join(', ')}]
+            </div>
+        </div>
+    `;
 }
 
 function highlightTopResult(searchResults) {
@@ -141,7 +164,7 @@ function cosineSimilarity(vecA, vecB) {
 
 async function handleSearch() {
   console.log('Search button clicked');
-  const { input } = getDOMElements();
+  const { input, queryDiv } = getDOMElements();
 
   try {
     if (!pipeline) {
@@ -150,6 +173,7 @@ async function handleSearch() {
 
     const query = input.value.trim();
     if (!query) {
+      queryDiv.innerHTML = ''; // Clear previous query if search is empty
       return;
     }
 
@@ -157,6 +181,7 @@ async function handleSearch() {
 
     // Generate embedding for the user's query
     const queryEmbedding = await pipeline(query, { pooling: 'mean', normalize: true });
+    renderQueryEmbedding(query, queryEmbedding);
 
     // Perform the search
     const searchResults = [];
@@ -184,7 +209,7 @@ async function handleSearch() {
 }
 
 async function setupSearchComponent() {
-    const { button, input } = getDOMElements();
+    const { button, input, corpusDiv } = getDOMElements();
 
     document.addEventListener('model-ready', async (event) => {
         console.log('Model is ready.');
@@ -213,6 +238,18 @@ async function setupSearchComponent() {
         if (e.key === 'Enter') {
             e.preventDefault();
             button.click();
+        }
+    });
+
+    // Event delegation for toggle buttons
+    document.body.addEventListener('click', (e) => {
+        if (e.target.classList.contains('toggle-vector-btn')) {
+            const targetId = e.target.getAttribute('data-target');
+            const targetElement = document.getElementById(targetId);
+            if (targetElement) {
+                targetElement.classList.toggle('hidden');
+                e.target.textContent = targetElement.classList.contains('hidden') ? 'Show Vector' : 'Hide Vector';
+            }
         }
     });
 }
