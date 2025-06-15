@@ -195,11 +195,8 @@ async function runStepByStep(query) {
     `);
 
     // 2. Model Forward Pass
-    // Request hidden states and attention weights from all layers.
-    const modelOutput = await model(tokens, {
-        output_hidden_states: true,
-        output_attentions: true,
-    });
+    // The model's config was updated on load to return all hidden states and attentions.
+    const modelOutput = await model(tokens);
 
     const hidden_states = modelOutput.hidden_states;
     const attentions = modelOutput.attentions;

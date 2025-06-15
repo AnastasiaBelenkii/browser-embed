@@ -20,6 +20,10 @@ async function initialize() {
         const tokenizer = await AutoTokenizer.from_pretrained(MODEL_NAME);
         const model = await AutoModel.from_pretrained(MODEL_NAME);
         
+        // FIX: Manually update the model's config to ensure it returns all hidden states and attentions
+        model.config.output_hidden_states = true;
+        model.config.output_attentions = true;
+
         // Create a pipeline for convenience, reusing the loaded model and tokenizer
         const pipe = await pipeline(TASK, MODEL_NAME, {
             tokenizer,
