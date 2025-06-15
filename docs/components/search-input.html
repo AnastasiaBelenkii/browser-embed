@@ -111,14 +111,17 @@ function renderStep(container, title, content) {
     `;
 }
 
+function renderTensorInfo(tensor, name) {
+    return `
+        <div class="tensor-info">
+            <strong>${name}:</strong>
+            <pre>Shape: [${tensor.dims.join(', ')}]\nData: [${tensor.data.slice(0, 5).map(v => v.toFixed(4)).join(', ')}, ...]</pre>
+        </div>
+    `;
+}
+
 // --- Manual Embedding Logic ---
 
-/**
- * Calculates the cosine similarity between two vectors.
- * @param {Float32Array} vecA The first vector.
- * @param {Float32Array} vecB The second vector.
- * @returns {number} The cosine similarity score.
- */
 function cosineSimilarity(vecA, vecB) {
     let dotProduct = 0;
     let normA = 0;
@@ -184,39 +187,72 @@ async function runStepByStep(query) {
     // 1. Tokenization
     const tokens = tokenizer(query, { padding: true, truncation: true });
     const stringTokens = Array.from(tokens.input_ids.data).map(id => tokenizer.decode([id]));
-    renderStep(stepsDiv, '1. Tokenize', `
-        <p>The input text is converted into tokens the model can understand.</p>
+    renderStep(stepsDiv, '1. Tokenization', `
+        <p>The input text is converted into tokens that the model has learned. Special tokens like [CLS] and [SEP] are added.</p>
         <pre>${JSON.stringify(stringTokens, null, 2)}</pre>
         <p>These tokens are then mapped to integer IDs from the model's vocabulary:</p>
         <pre>${JSON.stringify(tokens.input_ids.data, jsonReplacer, 2)}</pre>
     `);
 
     // 2. Model Forward Pass
-    const modelOutput = await model(tokens);
-    renderStep(stepsDiv, '2. Model Pass (Get Last Hidden State)', `
-        <p>The token IDs are fed through the transformer model. The output is a vector for each input token, now aware of its context.</p>
-        <p>Shape: [batch_size, num_tokens, embedding_dim] = [${modelOutput.last_hidden_state.dims.join(', ')}]</p>
-        <pre>${modelOutput.last_hidden_state.data.slice(0, 5).map(v => v.toFixed(4)).join(', ')}...</pre>
+    // Request hidden states and attention weights from all layers.
+    const modelOutput = await model(tokens, {
+        output_hidden_states: true,
+        output_attentions: true,
+    });
+
+    const hidden_states = modelOutput.hidden_states;
+    const attentions = modelOutput.attentions;
+
+    // Render Input Embeddings (the first hidden state)
+    renderStep(stepsDiv, '2. Input Embeddings', `
+        <p>The token IDs are converted into initial vector representations. This also includes positional information.</p>
+        ${renderTensorInfo(hidden_states[0], 'Input Embeddings')}
     `);
 
+    // Loop through each of the 6 transformer layers
+    for (let i = 0; i < attentions.length; ++i) {
+        const layerNum = i + 1;
+        const layerAttention = attentions[i];
+        const layerHiddenState = hidden_states[i + 1]; // Output of layer `i` is at index `i+1`
+
+        const layerContainer = document.createElement('div');
+        layerContainer.className = 'layer-container';
+        stepsDiv.appendChild(layerContainer);
+
+        renderStep(layerContainer, `Layer ${layerNum}: Self-Attention`, `
+            <p>The model weighs the importance of all other tokens for each token in the sequence. This is the core mechanism for building context.</p>
+            <p>The shape shows [batch_size, num_heads, sequence_length, sequence_length].</p>
+            ${renderTensorInfo(layerAttention, 'Attention Weights')}
+        `);
+
+        renderStep(layerContainer, `Layer ${layerNum}: Hidden State Output`, `
+            <p>The output of the attention mechanism is processed through a feed-forward network, producing a refined vector for each token.</p>
+            ${renderTensorInfo(layerHiddenState, 'Layer Output')}
+        `);
+    }
+    
+    const finalStepContainer = document.createElement('div');
+    stepsDiv.appendChild(finalStepContainer);
+
+    // Get the final hidden state for pooling
+    const last_hidden_state = hidden_states[hidden_states.length - 1];
+
     // 3. Pooling
-    const pooled = meanPooling(modelOutput.last_hidden_state, tokens.attention_mask);
-    renderStep(stepsDiv, '3. Mean Pooling', `
+    const pooled = meanPooling(last_hidden_state, tokens.attention_mask);
+    renderStep(finalStepContainer, '3. Pooling', `
         <p>To get a single vector for the whole sentence, we average the vectors of all the tokens (ignoring padding tokens).</p>
-        <p>Shape: [${pooled.dims.join(', ')}]</p>
-        <pre>${Array.from(pooled.data).slice(0, 10).map(v => v.toFixed(4)).join(', ')}...</pre>
+        ${renderTensorInfo(pooled, 'Pooled Vector')}
     `);
 
     // 4. Normalization
     const normalizedVector = normalize(pooled);
-    renderStep(stepsDiv, '4. Normalization', `
-        <p>The pooled vector is normalized to have a length of 1. This is crucial for accurate similarity calculations later.</p>
-        <p>Shape: [${normalizedVector.dims.join(', ')}]</p>
-        <pre>${Array.from(normalizedVector.data).slice(0, 10).map(v => v.toFixed(4)).join(', ')}...</pre>
+    renderStep(finalStepContainer, '4. Normalization', `
+        <p>The pooled vector is normalized to have a length of 1. This is crucial for accurate similarity calculations.</p>
+        ${renderTensorInfo(normalizedVector, 'Final Normalized Vector')}
         <p><strong>This final vector is the sentence embedding!</strong></p>
     `);
 
-    // Return the final vector for comparison
     return normalizedVector;
 }
 
@@ -402,6 +438,24 @@ try {
     margin: 0.5rem 0;
 }
 
+#step-by-step-container .layer-container {
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin-top: 1rem;
+    padding: 0 1rem;
+}
+#step-by-step-container .layer-container .step {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+}
+#step-by-step-container .layer-container .step:first-child {
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px dashed #ccc;
+}
+
+
 #results-container pre, #step-by-step-container pre {
   background: #e9ecef;
   padding: 0.5rem;
@@ -426,7 +480,11 @@ try {
     color: #8b949e;
   }
 
-  #results-container .comparison {
+  #results-container .comparison, #step-by-step-container .layer-container .step:first-child {
+      border-color: #30363d;
+  }
+
+  #step-by-step-container .layer-container {
       border-color: #30363d;
   }
 
