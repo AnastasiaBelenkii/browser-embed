@@ -125,7 +125,8 @@ function meanPooling(last_hidden_state, attention_mask) {
     // Iterate over each token
     for (let i = 0; i < numTokens; ++i) {
         // Check if the token is not a padding token (attention_mask === 1)
-        if (attentionMaskData[i] === 1) {
+        // FIX: Use loose equality (==) to compare BigInt (1n) with Number (1)
+        if (attentionMaskData[i] == 1) {
             // Add the token's embedding to the pooled embedding
             for (let j = 0; j < hiddenSize; ++j) {
                 pooled[j] += hiddenStateData[i * hiddenSize + j];
