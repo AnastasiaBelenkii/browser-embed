@@ -267,6 +267,12 @@ function setupSearchComponent() {
 
     document.addEventListener('model-ready', (event) => {
         console.log('Model is ready, enabling search UI.');
+        
+        // ADDED FOR DEBUGGING: This will pause execution as soon as the model is ready.
+        // You can inspect the event.detail object to see the pipeline, tokenizer, and model.
+        // Press "Resume script execution" (F8) to continue.
+        debugger; 
+
         pipeline = event.detail.pipeline;
         tokenizer = event.detail.tokenizer;
         model = event.detail.model;
