@@ -108,6 +108,10 @@ function renderStep(container, title, content) {
  * @returns {Tensor} The pooled embedding.
  */
 function meanPooling(last_hidden_state, attention_mask) {
+    // Use the debugger statement to programmatically pause execution here
+    // when DevTools is open. Remember to remove this line when you're done debugging!
+    debugger;
+
     const hiddenStateData = last_hidden_state.data;
     const attentionMaskData = attention_mask.data;
     
