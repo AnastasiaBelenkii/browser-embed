@@ -1,4 +1,4 @@
-import { env, pipeline, AutoTokenizer, AutoModel } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.5.0/dist/transformers.min.js';
+import { env, pipeline, AutoTokenizer, AutoModel, AutoConfig } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.5.0/dist/transformers.min.js';
 
 // Configuration
 const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
@@ -16,19 +16,18 @@ async function initialize() {
     try {
         console.log('Starting model and tokenizer loading...');
         
-        // Load the tokenizer and model separately for step-by-step visualization
+        // 1. Load the model's configuration and update it to output attentions and hidden states
+        const config = await AutoConfig.from_pretrained(MODEL_NAME);
+        config.output_hidden_states = true;
+        config.output_attentions = true;
+
+        // 2. Load the tokenizer
         const tokenizer = await AutoTokenizer.from_pretrained(MODEL_NAME);
 
-        // FIX: Pass configuration overrides directly to the from_pretrained method.
-        // This ensures the model is constructed to output all hidden states and attentions.
-        const model = await AutoModel.from_pretrained(MODEL_NAME, {
-            config: {
-                output_hidden_states: true,
-                output_attentions: true,
-            }
-        });
+        // 3. Load the model, passing the modified configuration
+        const model = await AutoModel.from_pretrained(MODEL_NAME, { config });
 
-        // Create a pipeline for convenience, reusing the loaded model and tokenizer
+        // 4. Create a pipeline for convenience, reusing the loaded model and tokenizer
         const pipe = await pipeline(TASK, MODEL_NAME, {
             tokenizer,
             model,
@@ -36,7 +35,7 @@ async function initialize() {
 
         console.log('Model, tokenizer, and pipeline loaded successfully!');
         
-        // Dispatch the event with all necessary components
+        // 5. Dispatch the event with all necessary components
         document.dispatchEvent(new CustomEvent('model-ready', { 
             detail: { 
                 pipeline: pipe,
