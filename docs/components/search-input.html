@@ -68,9 +68,9 @@ function setUIState(state) {
     }
 }
 
-function renderResults(embedding, query) {
+function renderResults(pipelineEmbedding, query, manualEmbedding) {
     const { resultsDiv } = getDOMElements();
-    const embeddingValues = Array.from(embedding.data);
+    const embeddingValues = Array.from(pipelineEmbedding.data);
     resultsDiv.innerHTML = `
       <h2>Pipeline Result</h2>
       <h3>Generated embedding (${embeddingValues.length} dimensions):</h3>
@@ -83,6 +83,18 @@ function renderResults(embedding, query) {
         Avg: ${(embeddingValues.reduce((a, b) => a + b, 0) / embeddingValues.length).toFixed(4)}
       </div>
     `;
+
+    // If a manual embedding was also generated, compare it to the pipeline's result
+    if (manualEmbedding) {
+        const similarity = cosineSimilarity(pipelineEmbedding.data, manualEmbedding.data);
+        resultsDiv.innerHTML += `
+            <div class="comparison">
+                <h4>Implementation Check</h4>
+                <p>Cosine Similarity between pipeline and step-by-step result: <strong>${similarity.toFixed(8)}</strong></p>
+                <p class="meta-text">(A value of 1.0 means our manual implementation is correct.)</p>
+            </div>
+        `;
+    }
 }
 
 function renderError(error) {
@@ -102,32 +114,35 @@ function renderStep(container, title, content) {
 // --- Manual Embedding Logic ---
 
 /**
- * Performs mean pooling on the last hidden state using plain JavaScript to avoid Tensor API issues.
- * @param {Tensor} last_hidden_state The model's last hidden state.
- * @param {Tensor} attention_mask The model's attention mask.
- * @returns {Tensor} The pooled embedding.
+ * Calculates the cosine similarity between two vectors.
+ * @param {Float32Array} vecA The first vector.
+ * @param {Float32Array} vecB The second vector.
+ * @returns {number} The cosine similarity score.
  */
-function meanPooling(last_hidden_state, attention_mask) {
-    // Use the debugger statement to programmatically pause execution here
-    // when DevTools is open. Remember to remove this line when you're done debugging!
-    debugger;
+function cosineSimilarity(vecA, vecB) {
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < vecA.length; i++) {
+        dotProduct += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+    }
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
 
+function meanPooling(last_hidden_state, attention_mask) {
     const hiddenStateData = last_hidden_state.data;
     const attentionMaskData = attention_mask.data;
     
     const hiddenSize = last_hidden_state.dims[2];
     const numTokens = last_hidden_state.dims[1];
 
-    // Create a new array to store the sum of the embeddings
     const pooled = new Float32Array(hiddenSize).fill(0);
     let num_tokens_to_pool = 0;
 
-    // Iterate over each token
     for (let i = 0; i < numTokens; ++i) {
-        // Check if the token is not a padding token (attention_mask === 1)
-        // FIX: Use loose equality (==) to compare BigInt (1n) with Number (1)
         if (attentionMaskData[i] == 1) {
-            // Add the token's embedding to the pooled embedding
             for (let j = 0; j < hiddenSize; ++j) {
                 pooled[j] += hiddenStateData[i * hiddenSize + j];
             }
@@ -135,40 +150,28 @@ function meanPooling(last_hidden_state, attention_mask) {
         }
     }
 
-    // Divide the summed embeddings by the number of non-padding tokens to get the mean
     for (let j = 0; j < hiddenSize; ++j) {
         pooled[j] /= num_tokens_to_pool;
     }
 
-    // Return the result as a new Tensor
     return new Tensor('float32', pooled, [1, hiddenSize]);
 }
 
-/**
- * Normalizes a tensor using plain JavaScript. This function does not use any
- * special Tensor math APIs like .div() or .norm() which may not exist.
- * @param {Tensor} tensor The tensor to normalize.
- * @returns {Tensor} The normalized tensor.
- */
 function normalize(tensor) {
     const data = tensor.data;
     const size = tensor.dims[1];
 
-    // Calculate L2 norm (Euclidean length) of the vector
     let norm = 0;
     for (let i = 0; i < size; ++i) {
         norm += data[i] * data[i];
     }
     norm = Math.sqrt(norm);
 
-    // Create a new array for the normalized data
     const normalizedData = new Float32Array(size);
     for (let i = 0; i < size; ++i) {
-        // Divide each element by the norm
         normalizedData[i] = data[i] / norm;
     }
 
-    // Return the result as a new Tensor
     return new Tensor('float32', normalizedData, tensor.dims);
 }
 
@@ -176,19 +179,11 @@ async function runStepByStep(query) {
     const { stepsDiv } = getDOMElements();
     stepsDiv.innerHTML = '<h2>Step-by-Step Breakdown</h2>';
 
-    // A "replacer" function for JSON.stringify to handle BigInts
-    const jsonReplacer = (key, value) => {
-        if (typeof value === 'bigint') {
-            return Number(value); // Convert BigInt to a regular number
-        }
-        return value;
-    };
+    const jsonReplacer = (key, value) => typeof value === 'bigint' ? Number(value) : value;
 
     // 1. Tokenization
     const tokens = tokenizer(query, { padding: true, truncation: true });
-    // Use the tokenizer's `decode` method on each individual token ID.
     const stringTokens = Array.from(tokens.input_ids.data).map(id => tokenizer.decode([id]));
-    
     renderStep(stepsDiv, '1. Tokenize', `
         <p>The input text is converted into tokens the model can understand.</p>
         <pre>${JSON.stringify(stringTokens, null, 2)}</pre>
@@ -220,6 +215,9 @@ async function runStepByStep(query) {
         <pre>${Array.from(normalizedVector.data).slice(0, 10).map(v => v.toFixed(4)).join(', ')}...</pre>
         <p><strong>This final vector is the sentence embedding!</strong></p>
     `);
+
+    // Return the final vector for comparison
+    return normalizedVector;
 }
 
 
@@ -244,11 +242,12 @@ async function handleSearch() {
     resultsDiv.innerHTML = 'Generating embedding...';
     stepsDiv.innerHTML = ''; // Clear previous steps
 
-    // Run the pipeline and step-by-step process sequentially to avoid a likely race condition.
+    // Run the pipeline and step-by-step process sequentially
     const pipelineOutput = await pipeline(query, { pooling: 'mean', normalize: true });
-    await runStepByStep(query);
+    const manualOutput = await runStepByStep(query);
 
-    renderResults(pipelineOutput, query);
+    // Render the main result and the comparison
+    renderResults(pipelineOutput, query, manualOutput);
 
   } catch (error) {
     console.error('Embedding failed:', error);
@@ -268,12 +267,6 @@ function setupSearchComponent() {
 
     document.addEventListener('model-ready', (event) => {
         console.log('Model is ready, enabling search UI.');
-        
-        // ADDED FOR DEBUGGING: This will pause execution as soon as the model is ready.
-        // You can inspect the event.detail object to see the pipeline, tokenizer, and model.
-        // Press "Resume script execution" (F8) to continue.
-        debugger; 
-
         pipeline = event.detail.pipeline;
         tokenizer = event.detail.tokenizer;
         model = event.detail.model;
@@ -375,6 +368,24 @@ try {
   color: #6c757d;
 }
 
+#results-container .comparison {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed #ccc;
+}
+
+#results-container .comparison p {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    font-size: 1rem;
+    margin: 0.5rem 0;
+}
+
+#results-container .meta-text {
+    font-style: italic;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
 #step-by-step-container .step {
     margin-bottom: 1rem;
     padding-bottom: 1rem;
@@ -411,8 +422,12 @@ try {
     color: #c9d1d9; /* Use the body's dark mode text color */
   }
 
-  #results-container .embedding-meta {
+  #results-container .embedding-meta, #results-container .meta-text {
     color: #8b949e;
+  }
+
+  #results-container .comparison {
+      border-color: #30363d;
   }
 
   #step-by-step-container .step {
