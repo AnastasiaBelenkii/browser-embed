@@ -13,10 +13,23 @@
 <script type="module">
 import { Tensor } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.5.0/dist/transformers.min.js';
 
-// Module-level state
+// --- State and Data ---
 let pipeline = null;
-let tokenizer = null;
-let model = null;
+
+const CORPUS = [
+    "The cat sat on the mat.",
+    "My dog loves to chase squirrels.",
+    "The sun is a star.",
+    "Jupiter is the largest planet in our solar system.",
+    "I enjoy reading books about history.",
+    "She is a talented musician who plays the piano.",
+    "The new software update includes several security patches.",
+    "To build a web application, you need to know HTML, CSS, and JavaScript.",
+    "The stock market experienced a significant downturn.",
+    "Economic policy can have a major impact on inflation."
+];
+let corpusEmbeddings = null;
+
 
 // --- UI Management ---
 
@@ -24,12 +37,11 @@ function getDOMElements() {
     const button = document.getElementById('search-button');
     const input = document.getElementById('search-input');
     const spinner = document.getElementById('spinner');
-    const resultsDiv = document.getElementById('results-container');
-    const stepsDiv = document.getElementById('step-by-step-container');
-    if (!button || !input || !spinner || !resultsDiv || !stepsDiv) {
+    const corpusDiv = document.getElementById('corpus-container');
+    if (!button || !input || !spinner || !corpusDiv) {
         throw new Error("Component UI elements not found.");
     }
-    return { button, input, spinner, resultsDiv, stepsDiv };
+    return { button, input, spinner, corpusDiv };
 }
 
 function setUIState(state) {
@@ -42,16 +54,22 @@ function setUIState(state) {
             input.placeholder = 'Loading model...';
             spinner.classList.remove('hidden');
         },
+        indexing: () => {
+            input.disabled = true;
+            button.disabled = true;
+            input.placeholder = 'Creating search index...';
+            spinner.classList.remove('hidden');
+        },
         ready: () => {
             input.disabled = false;
             button.disabled = false;
             input.placeholder = 'Enter search query...';
             spinner.classList.add('hidden');
         },
-        generating: () => {
+        searching: () => {
             input.disabled = true;
             button.disabled = true;
-            button.textContent = 'Generating...';
+            button.textContent = 'Searching...';
             spinner.classList.remove('hidden');
         },
         error: () => {
@@ -68,59 +86,46 @@ function setUIState(state) {
     }
 }
 
-function renderResults(pipelineEmbedding, query, manualEmbedding) {
-    const { resultsDiv } = getDOMElements();
-    const embeddingValues = Array.from(pipelineEmbedding.data);
-    resultsDiv.innerHTML = `
-      <h2>Pipeline Result</h2>
-      <h3>Generated embedding (${embeddingValues.length} dimensions):</h3>
-      <div class="embedding-values">
-        ${embeddingValues.slice(0, 10).map((v) => v.toFixed(4)).join(', ')}...
-      </div>
-      <div class="embedding-meta">
-        Min: ${Math.min(...embeddingValues).toFixed(4)}, 
-        Max: ${Math.max(...embeddingValues).toFixed(4)},
-        Avg: ${(embeddingValues.reduce((a, b) => a + b, 0) / embeddingValues.length).toFixed(4)}
-      </div>
-    `;
-
-    // If a manual embedding was also generated, compare it to the pipeline's result
-    if (manualEmbedding) {
-        const similarity = cosineSimilarity(pipelineEmbedding.data, manualEmbedding.data);
-        resultsDiv.innerHTML += `
-            <div class="comparison">
-                <h4>Implementation Check</h4>
-                <p>Cosine Similarity between pipeline and step-by-step result: <strong>${similarity.toFixed(8)}</strong></p>
-                <p class="meta-text">(A value of 1.0 means our manual implementation is correct.)</p>
+function renderCorpus() {
+    const { corpusDiv } = getDOMElements();
+    corpusDiv.innerHTML = '<h2>Corpus</h2>';
+    
+    CORPUS.forEach((text, i) => {
+        const vector = corpusEmbeddings.data.slice(i * 384, (i + 1) * 384);
+        corpusDiv.innerHTML += `
+            <div class="corpus-item" id="corpus-item-${i}">
+                <div class="corpus-text">${text}</div>
+                <div class="corpus-vector-preview">
+                    [${vector.slice(0, 4).map(v => v.toFixed(2)).join(', ')}, ...]
+                </div>
+                <div class="similarity-score" id="similarity-score-${i}"></div>
             </div>
         `;
+    });
+}
+
+function highlightTopResult(searchResults) {
+    // Clear previous highlights and scores
+    document.querySelectorAll('.corpus-item').forEach(item => {
+        item.classList.remove('highlight');
+    });
+    document.querySelectorAll('.similarity-score').forEach(score => {
+        score.textContent = '';
+    });
+
+    if (searchResults.length > 0) {
+        const topResult = searchResults[0];
+        const topItem = document.getElementById(`corpus-item-${topResult.index}`);
+        const topScore = document.getElementById(`similarity-score-${topResult.index}`);
+
+        if (topItem && topScore) {
+            topItem.classList.add('highlight');
+            topScore.textContent = `Similarity: ${topResult.score.toFixed(4)}`;
+        }
     }
 }
 
-function renderError(error) {
-    const { resultsDiv } = getDOMElements();
-    resultsDiv.innerHTML = `<div class="error">Failed to generate embedding: ${error.message}</div>`;
-}
-
-function renderStep(container, title, content) {
-    container.innerHTML += `
-        <div class="step">
-            <h4>${title}</h4>
-            <div class="step-content">${content}</div>
-        </div>
-    `;
-}
-
-function renderTensorInfo(tensor, name) {
-    return `
-        <div class="tensor-info">
-            <strong>${name}:</strong>
-            <pre>Shape: [${tensor.dims.join(', ')}]\nData: [${tensor.data.slice(0, 5).map(v => v.toFixed(4)).join(', ')}, ...]</pre>
-        </div>
-    `;
-}
-
-// --- Manual Embedding Logic ---
+// --- Core Logic ---
 
 function cosineSimilarity(vecA, vecB) {
     let dotProduct = 0;
@@ -134,124 +139,43 @@ function cosineSimilarity(vecA, vecB) {
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-function meanPooling(last_hidden_state, attention_mask) {
-    const hiddenStateData = last_hidden_state.data;
-    const attentionMaskData = attention_mask.data;
-    
-    const hiddenSize = last_hidden_state.dims[2];
-    const numTokens = last_hidden_state.dims[1];
-
-    const pooled = new Float32Array(hiddenSize).fill(0);
-    let num_tokens_to_pool = 0;
-
-    for (let i = 0; i < numTokens; ++i) {
-        if (attentionMaskData[i] == 1) {
-            for (let j = 0; j < hiddenSize; ++j) {
-                pooled[j] += hiddenStateData[i * hiddenSize + j];
-            }
-            num_tokens_to_pool++;
-        }
-    }
-
-    for (let j = 0; j < hiddenSize; ++j) {
-        pooled[j] /= num_tokens_to_pool;
-    }
-
-    return new Tensor('float32', pooled, [1, hiddenSize]);
-}
-
-function normalize(tensor) {
-    const data = tensor.data;
-    const size = tensor.dims[1];
-
-    let norm = 0;
-    for (let i = 0; i < size; ++i) {
-        norm += data[i] * data[i];
-    }
-    norm = Math.sqrt(norm);
-
-    const normalizedData = new Float32Array(size);
-    for (let i = 0; i < size; ++i) {
-        normalizedData[i] = data[i] / norm;
-    }
-
-    return new Tensor('float32', normalizedData, tensor.dims);
-}
-
-async function runStepByStep(query) {
-    const { stepsDiv } = getDOMElements();
-    stepsDiv.innerHTML = '<h2>Step-by-Step Breakdown</h2>';
-
-    const jsonReplacer = (key, value) => typeof value === 'bigint' ? Number(value) : value;
-
-    // Step 1: Tokenization
-    const tokens = tokenizer(query, { padding: true, truncation: true });
-    const stringTokens = Array.from(tokens.input_ids.data).map(id => tokenizer.decode([id]));
-    renderStep(stepsDiv, '1. Tokenization', `
-        <p>The input text is converted into tokens that the model has learned. Special tokens like [CLS] and [SEP] are added.</p>
-        <pre>${JSON.stringify(stringTokens, null, 2)}</pre>
-        <p>These tokens are then mapped to integer IDs from the model's vocabulary:</p>
-        <pre>${JSON.stringify(tokens.input_ids.data, jsonReplacer, 2)}</pre>
-    `);
-
-    // Step 2: Model Forward Pass
-    const modelOutput = await model(tokens);
-    renderStep(stepsDiv, '2. Model Pass (Get Last Hidden State)', `
-        <p>The token IDs are fed through the transformer model. The output is a vector for each input token, now aware of its context. This is the deepest representation of the tokens.</p>
-        ${renderTensorInfo(modelOutput.last_hidden_state, 'last_hidden_state')}
-    `);
-
-    // Step 3: Pooling
-    const pooled = meanPooling(modelOutput.last_hidden_state, tokens.attention_mask);
-    renderStep(stepsDiv, '3. Pooling', `
-        <p>To get a single vector for the whole sentence, we average the vectors of all the tokens (ignoring padding tokens).</p>
-        ${renderTensorInfo(pooled, 'Pooled Vector')}
-    `);
-
-    // Step 4: Normalization
-    const normalizedVector = normalize(pooled);
-    renderStep(stepsDiv, '4. Normalization', `
-        <p>The pooled vector is normalized to have a length of 1. This is crucial for accurate similarity calculations.</p>
-        ${renderTensorInfo(normalizedVector, 'Final Normalized Vector')}
-        <p><strong>This final vector is the sentence embedding!</strong></p>
-    `);
-
-    // Return the final vector for comparison
-    return normalizedVector;
-}
-
-
-// --- Core Logic ---
-
 async function handleSearch() {
   console.log('Search button clicked');
-  const { input, resultsDiv, stepsDiv } = getDOMElements();
+  const { input } = getDOMElements();
 
   try {
-    if (!pipeline || !tokenizer || !model) {
-      throw new Error('Pipeline, tokenizer, or model not available.');
+    if (!pipeline) {
+      throw new Error('Pipeline not available.');
     }
 
     const query = input.value.trim();
     if (!query) {
-      console.log('Empty query');
       return;
     }
 
-    setUIState('generating');
-    resultsDiv.innerHTML = 'Generating embedding...';
-    stepsDiv.innerHTML = ''; // Clear previous steps
+    setUIState('searching');
 
-    // Run the pipeline and step-by-step process sequentially
-    const pipelineOutput = await pipeline(query, { pooling: 'mean', normalize: true });
-    const manualOutput = await runStepByStep(query);
+    // Generate embedding for the user's query
+    const queryEmbedding = await pipeline(query, { pooling: 'mean', normalize: true });
 
-    // Render the main result and the comparison
-    renderResults(pipelineOutput, query, manualOutput);
+    // Perform the search
+    const searchResults = [];
+    for (let i = 0; i < CORPUS.length; i++) {
+        // Extract the pre-computed embedding for the current corpus item
+        const docEmbeddingData = corpusEmbeddings.data.slice(i * 384, (i + 1) * 384);
+        const score = cosineSimilarity(queryEmbedding.data, docEmbeddingData);
+        searchResults.push({ text: CORPUS[i], score: score, index: i });
+    }
 
+    // Sort results by score
+    searchResults.sort((a, b) => b.score - a.score);
+
+    // Highlight the top result in the UI
+    highlightTopResult(searchResults);
+    
   } catch (error) {
-    console.error('Embedding failed:', error);
-    renderError(error);
+    console.error('Search failed:', error);
+    alert(`Search failed: ${error.message}`);
   } finally {
     setUIState('ready');
     const { button } = getDOMElements();
@@ -259,17 +183,19 @@ async function handleSearch() {
   }
 }
 
-
-// --- Component Initialization ---
-
-function setupSearchComponent() {
+async function setupSearchComponent() {
     const { button, input } = getDOMElements();
 
-    document.addEventListener('model-ready', (event) => {
-        console.log('Model is ready, enabling search UI.');
+    document.addEventListener('model-ready', async (event) => {
+        console.log('Model is ready.');
         pipeline = event.detail.pipeline;
-        tokenizer = event.detail.tokenizer;
-        model = event.detail.model;
+
+        // Pre-compute embeddings for the corpus
+        setUIState('indexing');
+        corpusEmbeddings = await pipeline(CORPUS, { pooling: 'mean', normalize: true });
+        console.log('Corpus indexed.');
+        
+        renderCorpus();
         setUIState('ready');
     });
 
@@ -337,127 +263,5 @@ try {
 #search-button:disabled {
     cursor: not-allowed;
     opacity: 0.7;
-}
-
-/* Styles for the results container, colocated with the component that populates it */
-#results-container, #step-by-step-container {
-  margin-top: 1rem;
-  padding: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #f8f9fa;
-  color: #212529; /* Default text color for light background */
-  font-family: monospace;
-  font-size: 0.875rem;
-  word-wrap: break-word;
-}
-
-#results-container h2, #step-by-step-container h2 {
-    margin-top: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-}
-
-#results-container h3, #step-by-step-container h4 {
-  margin-top: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-}
-
-#results-container .embedding-meta {
-  margin: 0.5rem 0;
-  font-style: italic;
-  color: #6c757d;
-}
-
-#results-container .comparison {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px dashed #ccc;
-}
-
-#results-container .comparison p {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-    font-size: 1rem;
-    margin: 0.5rem 0;
-}
-
-#results-container .meta-text {
-    font-style: italic;
-    color: #6c757d;
-    font-size: 0.9rem;
-}
-
-#step-by-step-container .step {
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px dashed #ccc;
-}
-#step-by-step-container .step:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
-}
-#step-by-step-container .step-content p {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-    font-size: 1rem;
-    margin: 0.5rem 0;
-}
-
-#step-by-step-container .layer-container {
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    margin-top: 1rem;
-    padding: 0 1rem;
-}
-#step-by-step-container .layer-container .step {
-    border-bottom: none;
-    padding-bottom: 0;
-    margin-bottom: 0;
-}
-#step-by-step-container .layer-container .step:first-child {
-    padding-bottom: 1rem;
-    margin-bottom: 1rem;
-    border-bottom: 1px dashed #ccc;
-}
-
-
-#results-container pre, #step-by-step-container pre {
-  background: #e9ecef;
-  padding: 0.5rem;
-  border-radius: 4px;
-  white-space: pre-wrap;
-}
-
-#results-container .error {
-  color: #dc3545;
-  font-weight: bold;
-}
-
-/* Dark mode adjustments for results container */
-@media (prefers-color-scheme: dark) {
-  #results-container, #step-by-step-container {
-    background: #161b22;
-    border-color: #30363d;
-    color: #c9d1d9; /* Use the body's dark mode text color */
-  }
-
-  #results-container .embedding-meta, #results-container .meta-text {
-    color: #8b949e;
-  }
-
-  #results-container .comparison, #step-by-step-container .layer-container .step:first-child {
-      border-color: #30363d;
-  }
-
-  #step-by-step-container .layer-container {
-      border-color: #30363d;
-  }
-
-  #step-by-step-container .step {
-      border-color: #30363d;
-  }
-
-  #results-container pre, #step-by-step-container pre {
-    background: #0d1117;
-  }
 }
 </style>
