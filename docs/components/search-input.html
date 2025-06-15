@@ -97,11 +97,11 @@ function renderCorpus() {
             <div class="corpus-item" id="corpus-item-${i}">
                 <div class="corpus-text">${text}</div>
                 <div class="corpus-vector-preview">
-                    [${vector.slice(0, 4).map(v => v.toFixed(2)).join(', ')}, ...]
+                    [${vector.slice(0, 4).map(v => v.toFixed(4)).join(', ')}, ...]
                     <button class="toggle-vector-btn" data-target="corpus-vector-full-${i}">Show Vector</button>
                 </div>
                 <div class="corpus-vector-full hidden" id="corpus-vector-full-${i}">
-                    [${vector.join(', ')}]
+                    [${Array.from(vector).map(v => v.toFixed(4)).join(', ')}]
                 </div>
                 <div class="similarity-score" id="similarity-score-${i}"></div>
             </div>
@@ -117,11 +117,11 @@ function renderQueryEmbedding(query, embedding) {
         <div class="query-item">
             <div class="query-text">"${query}"</div>
             <div class="corpus-vector-preview">
-                [${vector.slice(0, 4).map(v => v.toFixed(2)).join(', ')}, ...]
+                [${vector.slice(0, 4).map(v => v.toFixed(4)).join(', ')}, ...]
                 <button class="toggle-vector-btn" data-target="query-vector-full">Show Vector</button>
             </div>
             <div class="corpus-vector-full hidden" id="query-vector-full">
-                [${vector.join(', ')}]
+                [${Array.from(vector).map(v => v.toFixed(4)).join(', ')}]
             </div>
         </div>
     `;
