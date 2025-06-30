@@ -10,7 +10,9 @@ A fully client-side semantic search engine that:
 - Works offline after initial load
 - Demonstrates transformer.js and vector search capabilities
 
-## Architecture Overview
+## Architecture Overview (FUTURE)
+
+Note: right now there is no storage or visualization layer, and a single web worker that takes care of all transformers.js operations
 
 ```mermaid
 graph TB
