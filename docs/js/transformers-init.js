@@ -1,7 +1,14 @@
 // This script initializes the embedding worker and provides a simple interface for interacting with it.
 
-// Create a new worker
-const worker = new Worker(new URL('./embedding-worker.js', import.meta.url), {
+// Create a URL for the worker script
+const workerUrl = new URL('./embedding-worker.js', import.meta.url);
+
+// Append a cache-busting query parameter. This is crucial for development to prevent
+// the browser from using a stale, cached version of the worker script.
+workerUrl.searchParams.set('t', Date.now());
+
+// Create a new worker using the cache-busted URL
+const worker = new Worker(workerUrl, {
     type: 'module'
 });
 
