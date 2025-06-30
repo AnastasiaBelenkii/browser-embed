@@ -11,11 +11,10 @@
 </div>
 
 <script type="module">
-import { Tensor } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.5.0/dist/transformers.min.js';
+// Import the function to interact with the embedding worker
+import { requestEmbedding } from '../js/transformers-init.js';
 
 // --- State and Data ---
-let pipeline = null;
-
 const CORPUS = [
     "The cat sat on the mat.",
     "My dog loves to chase squirrels.",
@@ -167,10 +166,6 @@ async function handleSearch() {
   const { input, queryDiv } = getDOMElements();
 
   try {
-    if (!pipeline) {
-      throw new Error('Pipeline not available.');
-    }
-
     const query = input.value.trim();
     if (!query) {
       queryDiv.innerHTML = ''; // Clear previous query if search is empty
@@ -179,8 +174,8 @@ async function handleSearch() {
 
     setUIState('searching');
 
-    // Generate embedding for the user's query
-    const queryEmbedding = await pipeline(query, { pooling: 'mean', normalize: true });
+    // Generate embedding for the user's query via the worker
+    const queryEmbedding = await requestEmbedding(query);
     renderQueryEmbedding(query, queryEmbedding);
 
     // Perform the search
@@ -209,19 +204,23 @@ async function handleSearch() {
 }
 
 async function setupSearchComponent() {
-    const { button, input, corpusDiv } = getDOMElements();
+    const { button, input } = getDOMElements();
 
-    document.addEventListener('model-ready', async (event) => {
-        console.log('Model is ready.');
-        pipeline = event.detail.pipeline;
-
-        // Pre-compute embeddings for the corpus
-        setUIState('indexing');
-        corpusEmbeddings = await pipeline(CORPUS, { pooling: 'mean', normalize: true });
-        console.log('Corpus indexed.');
+    document.addEventListener('model-ready', async () => {
+        console.log('Model is ready. Indexing corpus...');
         
-        renderCorpus();
-        setUIState('ready');
+        // Pre-compute embeddings for the corpus via the worker
+        setUIState('indexing');
+        try {
+            corpusEmbeddings = await requestEmbedding(CORPUS);
+            console.log('Corpus indexed.');
+            
+            renderCorpus();
+            setUIState('ready');
+        } catch (error) {
+            console.error('Corpus indexing failed:', error);
+            setUIState('error');
+        }
     });
 
     document.addEventListener('model-error', (event) => {
@@ -255,6 +254,8 @@ async function setupSearchComponent() {
 }
 
 try {
+    // Set initial loading state
+    setUIState('loadingModel');
     setupSearchComponent();
 } catch (error) {
     console.error('Failed to initialize search component:', error);

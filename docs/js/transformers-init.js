@@ -1,47 +1,64 @@
-import { env, pipeline, AutoTokenizer, AutoModel } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.5.0/dist/transformers.min.js';
+// This script initializes the embedding worker and provides a simple interface for interacting with it.
 
-// Configuration
-const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
-const TASK = 'feature-extraction';
+// Create a new worker
+const worker = new Worker(new URL('./embedding-worker.js', import.meta.url), {
+    type: 'module'
+});
 
-// Configure environment
-env.allowLocalModels = false; // Force use of remote models
-env.backends.onnx.wasm.numThreads = 1; // Recommended for browser
+// Store promises for embedding requests
+const embeddingPromises = new Map();
+let nextId = 0;
 
 /**
- * Initializes the pipeline, tokenizer, and model.
- * This function is called once and dispatches events to notify the UI.
+ * A function to request an embedding from the worker.
+ * @param {string | string[]} text The text or array of texts to embed.
+ * @returns {Promise<any>} A promise that resolves with the embedding result.
  */
-async function initialize() {
-    try {
-        console.log('Starting model and tokenizer loading...');
-        
-        // Load the tokenizer and model separately for step-by-step visualization.
-        const tokenizer = await AutoTokenizer.from_pretrained(MODEL_NAME);
-        const model = await AutoModel.from_pretrained(MODEL_NAME);
-
-        // Create a pipeline for convenience, reusing the loaded model and tokenizer
-        const pipe = await pipeline(TASK, MODEL_NAME, {
-            tokenizer,
-            model,
-        });
-
-        console.log('Model, tokenizer, and pipeline loaded successfully!');
-        
-        // Dispatch the event with all necessary components
-        document.dispatchEvent(new CustomEvent('model-ready', { 
-            detail: { 
-                pipeline: pipe,
-                tokenizer: tokenizer,
-                model: model,
-            } 
-        }));
-
-    } catch (error) {
-        console.error('Failed to load model:', error);
-        document.dispatchEvent(new CustomEvent('model-error', { detail: error }));
-    }
+export function requestEmbedding(text) {
+    const id = nextId++;
+    return new Promise((resolve, reject) => {
+        // Store the promise resolvers
+        embeddingPromises.set(id, { resolve, reject });
+        // Post the message to the worker
+        worker.postMessage({ type: 'embed', text, id });
+    });
 }
 
-// Start loading as soon as the script is loaded.
-initialize();
+// Listen for messages from the worker
+worker.onmessage = (event) => {
+    const { type, id, embedding, error } = event.data;
+
+    switch (type) {
+        case 'ready':
+            // The model is loaded and ready. Notify the application.
+            console.log('Embedding worker is ready.');
+            document.dispatchEvent(new CustomEvent('model-ready'));
+            break;
+        
+        case 'complete':
+            // An embedding request was completed successfully.
+            if (embeddingPromises.has(id)) {
+                embeddingPromises.get(id).resolve(embedding);
+                embeddingPromises.delete(id);
+            }
+            break;
+
+        case 'error':
+            // An error occurred in the worker.
+            console.error('Worker error:', error);
+            // If it's a general error, notify the whole app.
+            if (id === undefined) {
+                document.dispatchEvent(new CustomEvent('model-error', { detail: error }));
+            } else if (embeddingPromises.has(id)) {
+                // If it's an error for a specific request, reject that promise.
+                embeddingPromises.get(id).reject(new Error(error));
+                embeddingPromises.delete(id);
+            }
+            break;
+    }
+};
+
+worker.onerror = (error) => {
+    console.error('A critical error occurred in the embedding worker:', error);
+    document.dispatchEvent(new CustomEvent('model-error', { detail: error.message }));
+};
