@@ -49,12 +49,8 @@ Please.</p>
 
 <!-- Search component script is now directly here -->
 <script type="module">
-console.log('[search-input] Script execution started.');
-
 // Import the function to interact with the embedding worker and the model ready state
 import { requestEmbedding, modelReady } from './js/transformers-init.js';
-
-console.log('[search-input] Imports loaded.');
 
 // --- State and Data ---
 const CORPUS = [
@@ -75,7 +71,6 @@ let corpusEmbeddings = null;
 // --- UI Management ---
 
 function getDOMElements() {
-    console.log('[search-input] getDOMElements() called.');
     const button = document.getElementById('search-button');
     const input = document.getElementById('search-input');
     const spinner = document.getElementById('spinner');
@@ -85,12 +80,10 @@ function getDOMElements() {
         console.error('[search-input] A DOM element was not found!');
         throw new Error("Component UI elements not found.");
     }
-    console.log('[search-input] getDOMElements() succeeded.');
     return { button, input, spinner, corpusDiv, queryDiv };
 }
 
 function setUIState(state) {
-    console.log(`[search-input] setUIState() called with state: ${state}`);
     const { button, input, spinner } = getDOMElements();
     
     const states = {
@@ -208,7 +201,6 @@ function cosineSimilarity(vecA, vecB) {
 }
 
 async function handleSearch() {
-  console.log('Search button clicked');
   const { input, queryDiv } = getDOMElements();
 
   try {
@@ -253,39 +245,31 @@ async function handleSearch() {
  * This function is called when the model is ready. It indexes the corpus.
  */
 async function onModelReady() {
-    console.log('[search-input] onModelReady() called.');
-    
     // Pre-compute embeddings for the corpus via the worker
     setUIState('indexing');
     try {
         corpusEmbeddings = await requestEmbedding(CORPUS);
-        console.log('[search-input] Corpus indexed successfully.');
-        
         renderCorpus();
         setUIState('ready');
     } catch (error) {
-        console.error('[search-input] Corpus indexing failed:', error);
+        console.error('Corpus indexing failed:', error);
         setUIState('error');
     }
 }
 
 async function setupSearchComponent() {
-    console.log('[search-input] setupSearchComponent() called.');
     const { button, input } = getDOMElements();
 
     // This handles the race condition where the model might be ready
     // before this component's script has loaded and attached its listener.
-    console.log(`[search-input] Checking modelReady state: ${modelReady}`);
     if (modelReady) {
-        console.log('[search-input] Model is already ready, calling onModelReady directly.');
         onModelReady();
     } else {
-        console.log('[search-input] Model not ready, adding event listener.');
         document.addEventListener('model-ready', onModelReady, { once: true });
     }
 
     document.addEventListener('model-error', (event) => {
-        console.error('[search-input] Model loading failed, updating UI.', event.detail);
+        console.error('Model loading failed, updating UI.', event.detail);
         setUIState('error');
     });
 
@@ -315,13 +299,11 @@ async function setupSearchComponent() {
 }
 
 try {
-    console.log('[search-input] Main try block started.');
     // Set initial loading state
     setUIState('loadingModel');
     setupSearchComponent();
-    console.log('[search-input] setupSearchComponent() finished.');
 } catch (error) {
-    console.error('[search-input] CRITICAL: Failed to initialize search component:', error);
+    console.error('CRITICAL: Failed to initialize search component:', error);
     const container = document.querySelector('.search-container');
     if (container) {
         container.innerHTML = `<div class="error" style="width: 100%; text-align: center;">Error: Search component failed to load.</div>`;
