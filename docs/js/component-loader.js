@@ -37,8 +37,8 @@ export async function loadComponents() {
           newScript.setAttribute(attr.name, attr.value)
         );
 
-        // Copy inline code
-        newScript.textContent = oldScript.textContent;
+        // Copy inline code and add sourceURL for better debugging
+        newScript.textContent = oldScript.textContent + `\n//# sourceURL=${file}`;
 
         // Replace the old (inert) script with the live one
         oldScript.parentNode.replaceChild(newScript, oldScript);

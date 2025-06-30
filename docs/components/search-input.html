@@ -10,24 +10,49 @@
   <div id="spinner" class="spinner"></div>
 </div>
 
-<script>
-// Module-level state
-let pipeline = null;
+<script type="module">
+console.log('[search-input] Script execution started.');
+
+// Import the function to interact with the embedding worker and the model ready state
+import { requestEmbedding, modelReady } from '../js/transformers-init.js';
+
+console.log('[search-input] Imports loaded.');
+
+// --- State and Data ---
+const CORPUS = [
+    "The cat sat on the mat.",
+    "My dog loves to chase squirrels.",
+    "The sun is a star.",
+    "Jupiter is the largest planet in our solar system.",
+    "I enjoy reading books about history.",
+    "She is a talented musician who plays the piano.",
+    "The new software update includes several security patches.",
+    "To build a web application, you need to know HTML, CSS, and JavaScript.",
+    "The stock market experienced a significant downturn.",
+    "Economic policy can have a major impact on inflation."
+];
+let corpusEmbeddings = null;
+
 
 // --- UI Management ---
 
 function getDOMElements() {
+    console.log('[search-input] getDOMElements() called.');
     const button = document.getElementById('search-button');
     const input = document.getElementById('search-input');
     const spinner = document.getElementById('spinner');
-    const resultsDiv = document.getElementById('results-container');
-    if (!button || !input || !spinner || !resultsDiv) {
-        throw new Error("Search component UI elements not found.");
+    const corpusDiv = document.getElementById('corpus-container');
+    const queryDiv = document.getElementById('query-container');
+    if (!button || !input || !spinner || !corpusDiv || !queryDiv) {
+        console.error('[search-input] A DOM element was not found!');
+        throw new Error("Component UI elements not found.");
     }
-    return { button, input, spinner, resultsDiv };
+    console.log('[search-input] getDOMElements() succeeded.');
+    return { button, input, spinner, corpusDiv, queryDiv };
 }
 
-function setUIState(state, message = '') {
+function setUIState(state) {
+    console.log(`[search-input] setUIState() called with state: ${state}`);
     const { button, input, spinner } = getDOMElements();
     
     const states = {
@@ -37,16 +62,22 @@ function setUIState(state, message = '') {
             input.placeholder = 'Loading model...';
             spinner.classList.remove('hidden');
         },
+        indexing: () => {
+            input.disabled = true;
+            button.disabled = true;
+            input.placeholder = 'Creating search index...';
+            spinner.classList.remove('hidden');
+        },
         ready: () => {
             input.disabled = false;
             button.disabled = false;
             input.placeholder = 'Enter search query...';
             spinner.classList.add('hidden');
         },
-        generating: () => {
+        searching: () => {
             input.disabled = true;
             button.disabled = true;
-            button.textContent = 'Generating...';
+            button.textContent = 'Searching...';
             spinner.classList.remove('hidden');
         },
         error: () => {
@@ -63,63 +94,116 @@ function setUIState(state, message = '') {
     }
 }
 
-function renderResults(embedding, query) {
-    const { resultsDiv } = getDOMElements();
-    const embeddingValues = Array.from(embedding.data);
-    resultsDiv.innerHTML = `
-      <h3>Generated embedding (${embeddingValues.length} dimensions):</h3>
-      <div class="embedding-values">
-        ${embeddingValues.slice(0, 10).map((v) => v.toFixed(4)).join(', ')}...
-      </div>
-      <div class="embedding-meta">
-        Min: ${Math.min(...embeddingValues).toFixed(4)}, 
-        Max: ${Math.max(...embeddingValues).toFixed(4)},
-        Avg: ${(embeddingValues.reduce((a, b) => a + b, 0) / embeddingValues.length).toFixed(4)}
-      </div>
-      <pre class="debug">${JSON.stringify(
-        { query, embedding: embeddingValues.slice(0, 5) },
-        null,
-        2
-      )}</pre>
+function renderCorpus() {
+    const { corpusDiv } = getDOMElements();
+    corpusDiv.innerHTML = '<h2>Corpus</h2>';
+    
+    CORPUS.forEach((text, i) => {
+        const vector = corpusEmbeddings.data.slice(i * 384, (i + 1) * 384);
+        corpusDiv.innerHTML += `
+            <div class="corpus-item" id="corpus-item-${i}">
+                <div class="corpus-text">${text}</div>
+                <div class="corpus-vector-preview">
+                    [${vector.slice(0, 4).map(v => v.toFixed(4)).join(', ')}, ...]
+                    <button class="toggle-vector-btn" data-target="corpus-vector-full-${i}">Show Vector</button>
+                </div>
+                <div class="corpus-vector-full hidden" id="corpus-vector-full-${i}">
+                    [${Array.from(vector).map(v => v.toFixed(4)).join(', ')}]
+                </div>
+                <div class="similarity-score" id="similarity-score-${i}"></div>
+            </div>
+        `;
+    });
+}
+
+function renderQueryEmbedding(query, embedding) {
+    const { queryDiv } = getDOMElements();
+    const vector = embedding.data;
+    queryDiv.innerHTML = `
+        <h2>Your Query</h2>
+        <div class="query-item">
+            <div class="query-text">"${query}"</div>
+            <div class="corpus-vector-preview">
+                [${vector.slice(0, 4).map(v => v.toFixed(4)).join(', ')}, ...]
+                <button class="toggle-vector-btn" data-target="query-vector-full">Show Vector</button>
+            </div>
+            <div class="corpus-vector-full hidden" id="query-vector-full">
+                [${Array.from(vector).map(v => v.toFixed(4)).join(', ')}]
+            </div>
+        </div>
     `;
 }
 
-function renderError(error) {
-    const { resultsDiv } = getDOMElements();
-    resultsDiv.innerHTML = `<div class="error">Failed to generate embedding: ${error.message}</div>`;
-}
+function highlightTopResult(searchResults) {
+    // Clear previous highlights and scores
+    document.querySelectorAll('.corpus-item').forEach(item => {
+        item.classList.remove('highlight');
+    });
+    document.querySelectorAll('.similarity-score').forEach(score => {
+        score.textContent = '';
+    });
 
+    if (searchResults.length > 0) {
+        const topResult = searchResults[0];
+        const topItem = document.getElementById(`corpus-item-${topResult.index}`);
+        const topScore = document.getElementById(`similarity-score-${topResult.index}`);
+
+        if (topItem && topScore) {
+            topItem.classList.add('highlight');
+            topScore.textContent = `Similarity: ${topResult.score.toFixed(4)}`;
+        }
+    }
+}
 
 // --- Core Logic ---
 
+function cosineSimilarity(vecA, vecB) {
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < vecA.length; i++) {
+        dotProduct += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+    }
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
 async function handleSearch() {
   console.log('Search button clicked');
-  const { input, resultsDiv } = getDOMElements();
+  const { input, queryDiv } = getDOMElements();
 
   try {
-    if (!pipeline) {
-      throw new Error('Pipeline not available.');
-    }
-
     const query = input.value.trim();
     if (!query) {
-      console.log('Empty query');
+      queryDiv.innerHTML = ''; // Clear previous query if search is empty
       return;
     }
 
-    setUIState('generating');
-    resultsDiv.innerHTML = 'Generating embedding...';
+    setUIState('searching');
 
-    const output = await pipeline(query, {
-      pooling: 'mean',
-      normalize: true,
-    });
+    // Generate embedding for the user's query via the worker
+    const queryEmbedding = await requestEmbedding(query);
+    renderQueryEmbedding(query, queryEmbedding);
 
-    renderResults(output, query);
+    // Perform the search
+    const searchResults = [];
+    for (let i = 0; i < CORPUS.length; i++) {
+        // Extract the pre-computed embedding for the current corpus item
+        const docEmbeddingData = corpusEmbeddings.data.slice(i * 384, (i + 1) * 384);
+        const score = cosineSimilarity(queryEmbedding.data, docEmbeddingData);
+        searchResults.push({ text: CORPUS[i], score: score, index: i });
+    }
 
+    // Sort results by score
+    searchResults.sort((a, b) => b.score - a.score);
+
+    // Highlight the top result in the UI
+    highlightTopResult(searchResults);
+    
   } catch (error) {
-    console.error('Embedding failed:', error);
-    renderError(error);
+    console.error('Search failed:', error);
+    alert(`Search failed: ${error.message}`);
   } finally {
     setUIState('ready');
     const { button } = getDOMElements();
@@ -127,20 +211,43 @@ async function handleSearch() {
   }
 }
 
+/**
+ * This function is called when the model is ready. It indexes the corpus.
+ */
+async function onModelReady() {
+    console.log('[search-input] onModelReady() called.');
+    
+    // Pre-compute embeddings for the corpus via the worker
+    setUIState('indexing');
+    try {
+        corpusEmbeddings = await requestEmbedding(CORPUS);
+        console.log('[search-input] Corpus indexed successfully.');
+        
+        renderCorpus();
+        setUIState('ready');
+    } catch (error) {
+        console.error('[search-input] Corpus indexing failed:', error);
+        setUIState('error');
+    }
+}
 
-// --- Component Initialization ---
-
-function setupSearchComponent() {
+async function setupSearchComponent() {
+    console.log('[search-input] setupSearchComponent() called.');
     const { button, input } = getDOMElements();
 
-    document.addEventListener('model-ready', (event) => {
-        console.log('Model is ready, enabling search UI.');
-        pipeline = event.detail.pipeline; // Get pipeline from event
-        setUIState('ready');
-    });
+    // This handles the race condition where the model might be ready
+    // before this component's script has loaded and attached its listener.
+    console.log(`[search-input] Checking modelReady state: ${modelReady}`);
+    if (modelReady) {
+        console.log('[search-input] Model is already ready, calling onModelReady directly.');
+        onModelReady();
+    } else {
+        console.log('[search-input] Model not ready, adding event listener.');
+        document.addEventListener('model-ready', onModelReady, { once: true });
+    }
 
     document.addEventListener('model-error', (event) => {
-        console.error('Model loading failed, updating UI.', event.detail);
+        console.error('[search-input] Model loading failed, updating UI.', event.detail);
         setUIState('error');
     });
 
@@ -155,12 +262,28 @@ function setupSearchComponent() {
             button.click();
         }
     });
+
+    // Event delegation for toggle buttons
+    document.body.addEventListener('click', (e) => {
+        if (e.target.classList.contains('toggle-vector-btn')) {
+            const targetId = e.target.getAttribute('data-target');
+            const targetElement = document.getElementById(targetId);
+            if (targetElement) {
+                targetElement.classList.toggle('hidden');
+                e.target.textContent = targetElement.classList.contains('hidden') ? 'Show Vector' : 'Hide Vector';
+            }
+        }
+    });
 }
 
 try {
+    console.log('[search-input] Main try block started.');
+    // Set initial loading state
+    setUIState('loadingModel');
     setupSearchComponent();
+    console.log('[search-input] setupSearchComponent() finished.');
 } catch (error) {
-    console.error('Failed to initialize search component:', error);
+    console.error('[search-input] CRITICAL: Failed to initialize search component:', error);
     const container = document.querySelector('.search-container');
     if (container) {
         container.innerHTML = `<div class="error" style="width: 100%; text-align: center;">Error: Search component failed to load.</div>`;
@@ -203,58 +326,5 @@ try {
 #search-button:disabled {
     cursor: not-allowed;
     opacity: 0.7;
-}
-
-/* Styles for the results container, colocated with the component that populates it */
-#results-container {
-  margin-top: 1rem;
-  padding: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #f8f9fa;
-  color: #212529; /* Default text color for light background */
-  font-family: monospace;
-  font-size: 0.875rem;
-  word-wrap: break-word;
-}
-
-#results-container h3 {
-  margin-top: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-}
-
-#results-container .embedding-meta {
-  margin: 0.5rem 0;
-  font-style: italic;
-  color: #6c757d;
-}
-
-#results-container pre.debug {
-  background: #e9ecef;
-  padding: 0.5rem;
-  border-radius: 4px;
-  white-space: pre-wrap;
-}
-
-#results-container .error {
-  color: #dc3545;
-  font-weight: bold;
-}
-
-/* Dark mode adjustments for results container */
-@media (prefers-color-scheme: dark) {
-  #results-container {
-    background: #161b22;
-    border-color: #30363d;
-    color: #c9d1d9; /* Use the body's dark mode text color */
-  }
-
-  #results-container .embedding-meta {
-    color: #8b949e;
-  }
-
-  #results-container pre.debug {
-    background: #0d1117;
-  }
 }
 </style>
