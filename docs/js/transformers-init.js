@@ -5,6 +5,11 @@ const worker = new Worker(new URL('./embedding-worker.js', import.meta.url), {
     type: 'module'
 });
 
+// --- State ---
+// Export a state variable to track if the model is ready.
+// This helps components that load late handle the case where the 'model-ready' event was already dispatched.
+export let modelReady = false;
+
 // Store promises for embedding requests
 const embeddingPromises = new Map();
 let nextId = 0;
@@ -30,8 +35,9 @@ worker.onmessage = (event) => {
 
     switch (type) {
         case 'ready':
-            // The model is loaded and ready. Notify the application.
+            // The model is loaded and ready. Update state and notify the application.
             console.log('Embedding worker is ready.');
+            modelReady = true;
             document.dispatchEvent(new CustomEvent('model-ready'));
             break;
         

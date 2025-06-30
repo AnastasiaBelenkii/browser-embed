@@ -11,8 +11,8 @@
 </div>
 
 <script type="module">
-// Import the function to interact with the embedding worker
-import { requestEmbedding } from '../js/transformers-init.js';
+// Import the function to interact with the embedding worker and the model ready state
+import { requestEmbedding, modelReady } from '../js/transformers-init.js';
 
 // --- State and Data ---
 const CORPUS = [
@@ -203,25 +203,36 @@ async function handleSearch() {
   }
 }
 
+/**
+ * This function is called when the model is ready. It indexes the corpus.
+ */
+async function onModelReady() {
+    console.log('Model is ready. Indexing corpus...');
+    
+    // Pre-compute embeddings for the corpus via the worker
+    setUIState('indexing');
+    try {
+        corpusEmbeddings = await requestEmbedding(CORPUS);
+        console.log('Corpus indexed.');
+        
+        renderCorpus();
+        setUIState('ready');
+    } catch (error) {
+        console.error('Corpus indexing failed:', error);
+        setUIState('error');
+    }
+}
+
 async function setupSearchComponent() {
     const { button, input } = getDOMElements();
 
-    document.addEventListener('model-ready', async () => {
-        console.log('Model is ready. Indexing corpus...');
-        
-        // Pre-compute embeddings for the corpus via the worker
-        setUIState('indexing');
-        try {
-            corpusEmbeddings = await requestEmbedding(CORPUS);
-            console.log('Corpus indexed.');
-            
-            renderCorpus();
-            setUIState('ready');
-        } catch (error) {
-            console.error('Corpus indexing failed:', error);
-            setUIState('error');
-        }
-    });
+    // This handles the race condition where the model might be ready
+    // before this component's script has loaded and attached its listener.
+    if (modelReady) {
+        onModelReady();
+    } else {
+        document.addEventListener('model-ready', onModelReady, { once: true });
+    }
 
     document.addEventListener('model-error', (event) => {
         console.error('Model loading failed, updating UI.', event.detail);
