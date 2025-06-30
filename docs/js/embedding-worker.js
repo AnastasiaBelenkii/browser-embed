@@ -7,6 +7,7 @@ const TASK = 'feature-extraction';
 // Configure environment for worker
 env.allowLocalModels = false;
 env.backends.onnx.wasm.numThreads = 1;
+env.useCache = false; // Disable caching to prevent "Entry already exists" errors during dev
 
 // --- Singleton Class for Pipeline ---
 // Ensures the model is loaded only once.
