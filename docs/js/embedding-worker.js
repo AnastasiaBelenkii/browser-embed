@@ -1,4 +1,4 @@
-import { env, pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.5.0/dist/transformers.min.js';
+import { env, pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.5.0/dist/transformers.js';
 
 // --- Worker Configuration ---
 const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
