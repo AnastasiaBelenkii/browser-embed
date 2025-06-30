@@ -36,10 +36,17 @@ self.onmessage = async (event) => {
         // Retrieve the pipeline. This will load it if it's not already loaded.
         const embedder = await EmbeddingPipelineSingleton.getInstance();
 
-        // Generate the embedding.
-        const embedding = await embedder(text, { pooling: 'mean', normalize: true });
+        // Generate the embedding. This returns a Tensor object.
+        const tensor = await embedder(text, { pooling: 'mean', normalize: true });
 
-        // Post the result back to the main thread.
+        // Extract the raw data from the Tensor into a plain, clonable object.
+        const embedding = {
+            data: tensor.data,
+            dims: tensor.dims,
+            type: tensor.type,
+        };
+
+        // Post the plain object result back to the main thread.
         self.postMessage({
             type: 'complete',
             id,
