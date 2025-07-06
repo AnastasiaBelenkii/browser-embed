@@ -14,6 +14,47 @@ const HIGHLIGHT_COLOR = 0xd62728; // Bright red
 const HIGHLIGHT_EMISSIVE_COLOR = 0xffff00; // Yellow for outline/glow
 
 /**
+ * Creates a text label as a sprite.
+ * @param {string} text The text for the label.
+ * @param {THREE.Vector3} position The position for the label.
+ */
+function createAxisLabel(text, position) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const fontSize = 48;
+    context.font = `Bold ${fontSize}px Arial`;
+    
+    const metrics = context.measureText(text);
+    const textWidth = metrics.width;
+    canvas.width = textWidth;
+    canvas.height = fontSize;
+
+    // Font settings must be reset after canvas resizing
+    context.font = `Bold ${fontSize}px Arial`;
+    context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    context.fillText(text, 0, fontSize - 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+
+    const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+    });
+
+    const sprite = new THREE.Sprite(material);
+    
+    const spriteScale = 0.25;
+    sprite.scale.set(spriteScale * (canvas.width / canvas.height), spriteScale, 1);
+
+    sprite.position.copy(position);
+    scene.add(sprite);
+}
+
+
+/**
  * Initializes the 3D plot using Three.js.
  * @param {string} elementId The ID of the div element to render the plot in.
  */
@@ -60,6 +101,25 @@ export function initializeVisualization(elementId) {
     const originMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Black
     const origin = new THREE.Mesh(originGeometry, originMaterial);
     scene.add(origin);
+
+    // --- Axis Labels ---
+    const labels = [0.5, 1.0];
+    const labelOffset = 0.03; // To prevent z-fighting with axis line
+    labels.forEach(val => {
+        // X-axis
+        createAxisLabel(val.toString(), new THREE.Vector3(val, labelOffset, 0));
+        createAxisLabel((-val).toString(), new THREE.Vector3(-val, labelOffset, 0));
+        // Y-axis
+        createAxisLabel(val.toString(), new THREE.Vector3(labelOffset, val, 0));
+        createAxisLabel((-val).toString(), new THREE.Vector3(labelOffset, -val, 0));
+        // Z-axis
+        createAxisLabel(val.toString(), new THREE.Vector3(labelOffset, 0, val));
+        createAxisLabel((-val).toString(), new THREE.Vector3(labelOffset, 0, -val));
+    });
+    createAxisLabel('X', new THREE.Vector3(1.1, 0, 0));
+    createAxisLabel('Y', new THREE.Vector3(0, 1.1, 0));
+    createAxisLabel('Z', new THREE.Vector3(0, 0, 1.1));
+
 
     // --- Raycasting for Tooltips ---
     raycaster = new THREE.Raycaster();
@@ -145,19 +205,33 @@ function onPointerMove(event) {
 }
 
 /**
- * Creates a vector object (line + marker).
+ * Creates a vector object (line + arrowhead).
  */
 function createVector(point, color, text, isQuery = false) {
     const endPoint = new THREE.Vector3(...point);
-    const points = [new THREE.Vector3(0, 0, 0), endPoint];
     
+    // Line part
+    const points = [new THREE.Vector3(0, 0, 0), endPoint];
     const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
     const lineMaterial = new THREE.LineBasicMaterial({ color });
     const line = new THREE.Line(lineGeometry, lineMaterial);
 
-    const markerGeometry = new THREE.SphereGeometry(0.03, 16, 16);
+    // Arrowhead part
+    const coneHeight = 0.07;
+    const coneRadius = 0.025;
+    const markerGeometry = new THREE.ConeGeometry(coneRadius, coneHeight, 8);
+    // Move the cone's pivot to its tip
+    markerGeometry.translate(0, -coneHeight / 2, 0);
+
     const markerMaterial = new THREE.MeshStandardMaterial({ color });
     const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+
+    // Orient the cone to point in the vector's direction
+    const direction = endPoint.clone().normalize();
+    const up = new THREE.Vector3(0, 1, 0); // Default orientation of ConeGeometry
+    marker.quaternion.setFromUnitVectors(up, direction);
+    
+    // Position the cone's tip at the end of the vector
     marker.position.copy(endPoint);
     
     marker.userData.text = text;
