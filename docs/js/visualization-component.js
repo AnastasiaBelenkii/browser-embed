@@ -21,8 +21,10 @@ const HIGHLIGHT_EMISSIVE_COLOR = 0xffff00; // Yellow for outline/glow
 function createAxisLabel(text, position) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    const fontSize = 4;
-    context.font = `${fontSize}px Arial`;
+    
+    // Use a large, fixed font size to generate a crisp texture.
+    const fontSize = 64;
+    context.font = `Bold ${fontSize}px Arial`;
     
     const metrics = context.measureText(text);
     const textWidth = metrics.width;
@@ -32,7 +34,7 @@ function createAxisLabel(text, position) {
     // Font settings must be reset after canvas resizing
     context.font = `Bold ${fontSize}px Arial`;
     context.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    context.fillText(text, 0, fontSize - 2);
+    context.fillText(text, 0, fontSize - 10); // Adjust vertical alignment
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
@@ -46,7 +48,8 @@ function createAxisLabel(text, position) {
 
     const sprite = new THREE.Sprite(material);
     
-    const spriteScale = 0.25;
+    // Control the final size in the 3D scene by adjusting the scale.
+    const spriteScale = 0.10;
     sprite.scale.set(spriteScale * (canvas.width / canvas.height), spriteScale, 1);
 
     sprite.position.copy(position);
@@ -116,9 +119,6 @@ export function initializeVisualization(elementId) {
         createAxisLabel(val.toString(), new THREE.Vector3(labelOffset, 0, val));
         createAxisLabel((-val).toString(), new THREE.Vector3(labelOffset, 0, -val));
     });
-    createAxisLabel('X', new THREE.Vector3(1.1, 0, 0));
-    createAxisLabel('Y', new THREE.Vector3(0, 1.1, 0));
-    createAxisLabel('Z', new THREE.Vector3(0, 0, 1.1));
 
 
     // --- Raycasting for Tooltips ---
