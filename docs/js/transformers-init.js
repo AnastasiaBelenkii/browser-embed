@@ -53,17 +53,29 @@ export function requestQueryProjection(embedding) {
 // Listen for messages from the worker
 worker.onmessage = (event) => {
     const { type, id, error } = event.data;
-    const promise = promises.get(id);
 
-    if (!promise) return;
+    // Handle non-promise-based messages first
+    if (type === 'ready') {
+        console.log('Embedding worker is ready.');
+        modelReady = true;
+        document.dispatchEvent(new CustomEvent('model-ready'));
+        return;
+    }
+
+    // Handle global errors that might not have an ID
+    if (type === 'error' && id === undefined) {
+        console.error('Worker error:', error);
+        document.dispatchEvent(new CustomEvent('model-error', { detail: error }));
+        return;
+    }
+
+    // Now, handle promise-based messages
+    const promise = promises.get(id);
+    if (!promise) {
+        return;
+    }
 
     switch (type) {
-        case 'ready':
-            console.log('Embedding worker is ready.');
-            modelReady = true;
-            document.dispatchEvent(new CustomEvent('model-ready'));
-            break;
-        
         case 'complete':
         case 'corpusReduced':
         case 'queryProjected':
@@ -74,13 +86,9 @@ worker.onmessage = (event) => {
             break;
 
         case 'error':
-            console.error('Worker error:', error);
-            if (id === undefined) {
-                document.dispatchEvent(new CustomEvent('model-error', { detail: error }));
-            } else {
-                promise.reject(new Error(error));
-                promises.delete(id);
-            }
+            console.error(`Worker error for request ${id}:`, error);
+            promise.reject(new Error(error));
+            promises.delete(id);
             break;
     }
 };

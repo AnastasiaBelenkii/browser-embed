@@ -137,6 +137,9 @@ function highlightTopResult(searchResults) {
         }
         // Highlight the point on the 3D graph
         highlightPoint(topResult.index);
+    } else {
+        // No results, so clear the highlight on the graph
+        highlightPoint(-1);
     }
 }
 
@@ -161,6 +164,7 @@ async function handleSearch() {
     const query = input.value.trim();
     if (!query) {
       queryDiv.innerHTML = ''; // Clear previous query if search is empty
+      highlightTopResult([]); // Clear highlights
       return;
     }
 

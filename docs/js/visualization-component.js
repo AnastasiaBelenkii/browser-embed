@@ -5,6 +5,9 @@
 let plotElement = null;
 let isInitialized = false;
 
+const BASE_MARKER_COLOR = '#1f77b4';
+const BASE_MARKER_SIZE = 5;
+
 const layout = {
     title: 'Corpus and Query Embeddings',
     autosize: true,
@@ -48,8 +51,8 @@ export function plotCorpus(corpus3d, corpusText) {
         text: corpusText,
         hoverinfo: 'text',
         marker: {
-            size: 5,
-            color: '#1f77b4', // Muted blue
+            size: BASE_MARKER_SIZE,
+            color: BASE_MARKER_COLOR,
             opacity: 0.8,
         },
     };
@@ -81,24 +84,42 @@ export function plotQuery(query3d, queryText) {
         },
     };
 
-    // Add the query trace. Plotly will add it if it's new or update if it exists by name.
-    Plotly.addTraces(plotElement, trace);
+    // Check if a 'Query' trace already exists
+    const queryTraceIndex = plotElement.data.findIndex(t => t.name === 'Query');
+
+    if (queryTraceIndex > -1) {
+        // Update existing trace's data
+        Plotly.restyle(plotElement, {
+            x: [trace.x],
+            y: [trace.y],
+            z: [trace.z],
+            text: [trace.text]
+        }, queryTraceIndex);
+    } else {
+        // Add the query trace if it doesn't exist
+        Plotly.addTraces(plotElement, trace);
+    }
 }
 
 /**
  * Highlights a specific point in the corpus plot.
- * @param {number} pointIndex - The index of the point to highlight.
+ * @param {number} pointIndex - The index of the point to highlight. A negative index clears the highlight.
  */
 export function highlightPoint(pointIndex) {
-    if (!isInitialized || !plotElement || plotElement.data.length === 0) return;
+    if (!isInitialized || !plotElement || !plotElement.data || plotElement.data.length === 0) return;
 
     const corpusTrace = plotElement.data[0];
-    const colors = new Array(corpusTrace.x.length).fill(corpusTrace.marker.color);
-    const sizes = new Array(corpusTrace.x.length).fill(corpusTrace.marker.size);
+    const numPoints = corpusTrace.x.length;
 
-    // Highlight the top result
-    colors[pointIndex] = '#d62728'; // Bright red
-    sizes[pointIndex] = 10;
+    // Reset all points to base style
+    const colors = new Array(numPoints).fill(BASE_MARKER_COLOR);
+    const sizes = new Array(numPoints).fill(BASE_MARKER_SIZE);
+
+    // Highlight the top result if the index is valid
+    if (pointIndex >= 0 && pointIndex < numPoints) {
+        colors[pointIndex] = '#d62728'; // Bright red
+        sizes[pointIndex] = 10;
+    }
 
     const update = {
         'marker.color': [colors],
