@@ -21,8 +21,8 @@ const HIGHLIGHT_EMISSIVE_COLOR = 0xffff00; // Yellow for outline/glow
 function createAxisLabel(text, position) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    const fontSize = 48;
-    context.font = `Bold ${fontSize}px Arial`;
+    const fontSize = 4;
+    context.font = `${fontSize}px Arial`;
     
     const metrics = context.measureText(text);
     const textWidth = metrics.width;
@@ -97,7 +97,7 @@ export function initializeVisualization(elementId) {
     scene.add(axesHelper);
     
     // --- Origin Marker ---
-    const originGeometry = new THREE.SphereGeometry(0.02, 16, 16);
+    const originGeometry = new THREE.SphereGeometry(0.002, 16, 16);
     const originMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Black
     const origin = new THREE.Mesh(originGeometry, originMaterial);
     scene.add(origin);
@@ -217,8 +217,8 @@ function createVector(point, color, text, isQuery = false) {
     const line = new THREE.Line(lineGeometry, lineMaterial);
 
     // Arrowhead part
-    const coneHeight = 0.07;
-    const coneRadius = 0.025;
+    const coneHeight = 0.007;
+    const coneRadius = 0.0025;
     const markerGeometry = new THREE.ConeGeometry(coneRadius, coneHeight, 8);
     // Move the cone's pivot to its tip
     markerGeometry.translate(0, -coneHeight / 2, 0);
