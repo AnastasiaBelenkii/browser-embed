@@ -1,166 +1,209 @@
-/**
- * A component to manage the 3D visualization of embeddings using Plotly.js.
- */
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-let plotElement = null;
-let isInitialized = false;
+// --- Three.js Module-level variables ---
+let scene, camera, renderer, controls;
+let corpusVectorsGroup, queryVectorGroup;
+let raycaster, pointer, tooltipElement;
+let currentlyIntersected, currentlyHighlighted;
 
-const BASE_MARKER_COLOR = '#1f77b4';
-const BASE_MARKER_SIZE = 5;
-const HIGHLIGHT_COLOR = '#d62728'; // Bright red for fill
-const HIGHLIGHT_OUTLINE_COLOR = 'yellow';
-const QUERY_COLOR = '#ff7f0e'; // Bright orange
-
-const layout = {
-    title: 'Corpus and Query Embeddings',
-    autosize: true,
-    margin: { l: 0, r: 0, b: 0, t: 40 },
-    scene: {
-        xaxis: {
-            title: 'Dim 1',
-            range: [-1, 1],
-            zeroline: true,
-            zerolinewidth: 4,
-            zerolinecolor: 'rgba(0,0,0,0.4)',
-            showgrid: false,
-            showline: false,
-            showbackground: false,
-        },
-        yaxis: {
-            title: 'Dim 2',
-            range: [-1, 1],
-            zeroline: true,
-            zerolinewidth: 4,
-            zerolinecolor: 'rgba(0,0,0,0.4)',
-            showgrid: false,
-            showline: false,
-            showbackground: false,
-        },
-        zaxis: {
-            title: 'Dim 3',
-            range: [-1, 1],
-            zeroline: true,
-            zerolinewidth: 4,
-            zerolinecolor: 'rgba(0,0,0,0.4)',
-            showgrid: false,
-            showline: false,
-            showbackground: false,
-        },
-    },
-};
+// --- Constants ---
+const BASE_COLOR = 0x1f77b4; // Muted blue
+const QUERY_COLOR = 0xff7f0e; // Bright orange
+const HIGHLIGHT_COLOR = 0xd62728; // Bright red
+const HIGHLIGHT_EMISSIVE_COLOR = 0xffff00; // Yellow for outline/glow
 
 /**
- * Initializes the 3D plot.
+ * Initializes the 3D plot using Three.js.
  * @param {string} elementId The ID of the div element to render the plot in.
  */
 export function initializeVisualization(elementId) {
-    plotElement = document.getElementById(elementId);
-    if (!plotElement) {
+    const container = document.getElementById(elementId);
+    if (!container) {
         console.error(`Visualization container with id "${elementId}" not found.`);
         return;
     }
-    isInitialized = true;
+
+    // --- Basic Scene Setup ---
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff); // White background
+
+    const width = container.clientWidth;
+    const height = container.clientHeight || 500; // Fallback height
+
+    camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+    camera.position.set(1, 1, 1);
+    camera.lookAt(0, 0, 0);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(width, height);
+    container.appendChild(renderer.domElement);
+
+    // --- Controls ---
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // --- Lighting ---
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 10, 7.5);
+    scene.add(directionalLight);
+
+    // --- Axes Helper ---
+    const axesHelper = new THREE.AxesHelper(1); // Length of 1 unit
+    scene.add(axesHelper);
+    
+    // --- Origin Marker ---
+    const originGeometry = new THREE.SphereGeometry(0.02, 16, 16);
+    const originMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Black
+    const origin = new THREE.Mesh(originGeometry, originMaterial);
+    scene.add(origin);
+
+    // --- Raycasting for Tooltips ---
+    raycaster = new THREE.Raycaster();
+    pointer = new THREE.Vector2();
+    tooltipElement = document.createElement('div');
+    tooltipElement.className = 'tooltip'; // Add a class for styling
+    document.body.appendChild(tooltipElement);
+
+    // --- Tooltip CSS ---
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .tooltip {
+            position: absolute;
+            display: none;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.75);
+            color: white;
+            border-radius: 4px;
+            pointer-events: none; /* So it doesn't interfere with other mouse events */
+            font-family: sans-serif;
+            font-size: 14px;
+            z-index: 100;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // --- Event Listeners ---
+    window.addEventListener('resize', onWindowResize);
+    container.addEventListener('pointermove', onPointerMove);
+
+    // --- Animation Loop ---
+    animate();
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    handleIntersections();
+    renderer.render(scene, camera);
+}
+
+function onWindowResize() {
+    const container = renderer.domElement.parentElement;
+    if (!container) return;
+    
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(width, height);
+}
+
+function onPointerMove(event) {
+    const container = renderer.domElement.parentElement;
+    const rect = container.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function handleIntersections() {
+    raycaster.setFromCamera(pointer, camera);
+    const intersects = raycaster.intersectObjects(corpusVectorsGroup ? corpusVectorsGroup.children : [], true);
+
+    const vectorHeadIntersects = intersects.filter(i => i.object.userData.isVectorHead);
+
+    if (vectorHeadIntersects.length > 0) {
+        const intersectedObject = vectorHeadIntersects[0].object;
+        if (currentlyIntersected !== intersectedObject) {
+            currentlyIntersected = intersectedObject;
+            tooltipElement.style.display = 'block';
+            tooltipElement.innerHTML = currentlyIntersected.userData.text;
+        }
+        tooltipElement.style.left = `${event.clientX + 15}px`;
+        tooltipElement.style.top = `${event.clientY}px`;
+    } else {
+        if (currentlyIntersected) {
+            tooltipElement.style.display = 'none';
+        }
+        currentlyIntersected = null;
+    }
 }
 
 /**
- * Draws the 3D scatter plot of the corpus embeddings as vectors from the origin.
+ * Creates a vector object (line + marker).
+ */
+function createVector(point, color, text, isQuery = false) {
+    const endPoint = new THREE.Vector3(...point);
+    const points = [new THREE.Vector3(0, 0, 0), endPoint];
+    
+    const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+    const lineMaterial = new THREE.LineBasicMaterial({ color });
+    const line = new THREE.Line(lineGeometry, lineMaterial);
+
+    const markerGeometry = new THREE.SphereGeometry(0.03, 16, 16);
+    const markerMaterial = new THREE.MeshStandardMaterial({ color });
+    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+    marker.position.copy(endPoint);
+    
+    marker.userData.text = text;
+    marker.userData.isVectorHead = true;
+    marker.userData.originalColor = color;
+
+    if (isQuery) {
+        marker.material.emissive.setHex(HIGHLIGHT_EMISSIVE_COLOR);
+        marker.material.emissiveIntensity = 0.7;
+    }
+
+    const group = new THREE.Group();
+    group.add(line);
+    group.add(marker);
+    return group;
+}
+
+/**
+ * Draws the 3D scatter plot of the corpus embeddings.
  * @param {number[][]} corpus3d - An array of 3D points for the corpus.
  * @param {string[]} corpusText - The original text for hover info.
  */
 export function plotCorpus(corpus3d, corpusText) {
-    if (!isInitialized || !plotElement) return;
+    if (corpusVectorsGroup) {
+        scene.remove(corpusVectorsGroup);
+    }
+    corpusVectorsGroup = new THREE.Group();
 
-    const lineX = [], lineY = [], lineZ = [], lineText = [], markerSizes = [];
     corpus3d.forEach((p, i) => {
-        lineX.push(0, p[0], null);
-        lineY.push(0, p[1], null);
-        lineZ.push(0, p[2], null);
-        lineText.push('', corpusText[i], '');
-        markerSizes.push(0, BASE_MARKER_SIZE, 0);
+        const vector = createVector(p, BASE_COLOR, corpusText[i]);
+        corpusVectorsGroup.add(vector);
     });
 
-    const corpusTrace = {
-        x: lineX,
-        y: lineY,
-        z: lineZ,
-        mode: 'lines+markers',
-        type: 'scatter3d',
-        name: 'Corpus',
-        text: lineText,
-        hoverinfo: 'text',
-        line: {
-            color: BASE_MARKER_COLOR,
-            width: 2,
-        },
-        marker: {
-            size: markerSizes,
-            color: BASE_MARKER_COLOR,
-            opacity: 0.8,
-        },
-    };
-
-    const originTrace = {
-        x: [0],
-        y: [0],
-        z: [0],
-        mode: 'markers',
-        type: 'scatter3d',
-        name: 'Origin',
-        hoverinfo: 'none',
-        marker: {
-            size: 4,
-            color: 'black',
-            symbol: 'circle'
-        }
-    };
-
-    Plotly.newPlot(plotElement, [corpusTrace, originTrace], layout);
+    scene.add(corpusVectorsGroup);
 }
 
 /**
- * Adds or updates the query point on the plot as a vector from the origin.
+ * Adds or updates the query point on the plot.
  * @param {number[]} query3d - The 3D point for the query.
  * @param {string} queryText - The original query text for hover info.
  */
 export function plotQuery(query3d, queryText) {
-    if (!isInitialized || !plotElement) return;
-
-    const trace = {
-        x: [0, query3d[0]],
-        y: [0, query3d[1]],
-        z: [0, query3d[2]],
-        mode: 'lines+markers',
-        type: 'scatter3d',
-        name: 'Query',
-        text: ['', queryText],
-        hoverinfo: 'text',
-        line: {
-            color: QUERY_COLOR,
-            width: 4,
-        },
-        marker: {
-            size: [0, 8],
-            color: QUERY_COLOR,
-            symbol: 'diamond',
-            line: {
-                color: HIGHLIGHT_OUTLINE_COLOR,
-                width: 2,
-            }
-        },
-    };
-
-    const queryTraceIndex = plotElement.data.findIndex(t => t.name === 'Query');
-
-    if (queryTraceIndex > -1) {
-        Plotly.restyle(plotElement, {
-            x: [trace.x],
-            y: [trace.y],
-            z: [trace.z],
-            text: [trace.text]
-        }, queryTraceIndex);
-    } else {
-        Plotly.addTraces(plotElement, trace);
+    if (queryVectorGroup) {
+        scene.remove(queryVectorGroup);
     }
+    queryVectorGroup = createVector(query3d, QUERY_COLOR, queryText, true);
+    scene.add(queryVectorGroup);
 }
 
 /**
@@ -168,34 +211,28 @@ export function plotQuery(query3d, queryText) {
  * @param {number} pointIndex - The index of the point to highlight. A negative index clears the highlight.
  */
 export function highlightPoint(pointIndex) {
-    if (!isInitialized || !plotElement || !plotElement.data || plotElement.data.length === 0) return;
-
-    const corpusTrace = plotElement.data[0];
-    const numPoints = corpusTrace.x.length;
-
-    // Reset all points to base style
-    const colors = new Array(numPoints).fill(BASE_MARKER_COLOR);
-    const sizes = new Array(numPoints).fill(0).map((_, i) => (i % 3 === 1 ? BASE_MARKER_SIZE : 0));
-    const outlineColors = new Array(numPoints).fill('rgba(0,0,0,0)');
-    const outlineWidths = new Array(numPoints).fill(0);
-
-    // Highlight the top result if the index is valid
-    if (pointIndex >= 0) {
-        const highlightIndex = pointIndex * 3 + 1;
-        if (highlightIndex < numPoints) {
-            colors[highlightIndex] = HIGHLIGHT_COLOR;
-            sizes[highlightIndex] = 10;
-            outlineColors[highlightIndex] = HIGHLIGHT_OUTLINE_COLOR;
-            outlineWidths[highlightIndex] = 2;
+    // Reset previously highlighted vector
+    if (currentlyHighlighted) {
+        const marker = currentlyHighlighted.children.find(c => c.isMesh);
+        if (marker) {
+            marker.material.color.setHex(marker.userData.originalColor);
+            marker.material.emissive.setHex(0x000000);
         }
+        currentlyHighlighted = null;
     }
 
-    const update = {
-        'marker.color': [colors],
-        'marker.size': [sizes],
-        'marker.line.color': [outlineColors],
-        'marker.line.width': [outlineWidths],
-    };
+    if (pointIndex < 0 || !corpusVectorsGroup || pointIndex >= corpusVectorsGroup.children.length) {
+        return;
+    }
 
-    Plotly.restyle(plotElement, update, 0); // 0 is the index of the corpus trace
+    // Highlight the new vector
+    const vectorToHighlight = corpusVectorsGroup.children[pointIndex];
+    const markerToHighlight = vectorToHighlight.children.find(c => c.isMesh);
+
+    if (markerToHighlight) {
+        markerToHighlight.material.color.setHex(HIGHLIGHT_COLOR);
+        markerToHighlight.material.emissive.setHex(HIGHLIGHT_EMISSIVE_COLOR);
+        markerToHighlight.material.emissiveIntensity = 0.7;
+        currentlyHighlighted = vectorToHighlight;
+    }
 }
