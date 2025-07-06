@@ -16,9 +16,36 @@ const layout = {
     autosize: true,
     margin: { l: 0, r: 0, b: 0, t: 40 },
     scene: {
-        xaxis: { title: 'Dim 1', range: [-1, 1] },
-        yaxis: { title: 'Dim 2', range: [-1, 1] },
-        zaxis: { title: 'Dim 3', range: [-1, 1] },
+        xaxis: {
+            title: 'Dim 1',
+            range: [-1, 1],
+            zeroline: true,
+            zerolinewidth: 4,
+            zerolinecolor: 'rgba(0,0,0,0.4)',
+            showgrid: false,
+            showline: false,
+            showbackground: false,
+        },
+        yaxis: {
+            title: 'Dim 2',
+            range: [-1, 1],
+            zeroline: true,
+            zerolinewidth: 4,
+            zerolinecolor: 'rgba(0,0,0,0.4)',
+            showgrid: false,
+            showline: false,
+            showbackground: false,
+        },
+        zaxis: {
+            title: 'Dim 3',
+            range: [-1, 1],
+            zeroline: true,
+            zerolinewidth: 4,
+            zerolinecolor: 'rgba(0,0,0,0.4)',
+            showgrid: false,
+            showline: false,
+            showbackground: false,
+        },
     },
 };
 
@@ -52,7 +79,7 @@ export function plotCorpus(corpus3d, corpusText) {
         markerSizes.push(0, BASE_MARKER_SIZE, 0);
     });
 
-    const trace = {
+    const corpusTrace = {
         x: lineX,
         y: lineY,
         z: lineZ,
@@ -72,7 +99,22 @@ export function plotCorpus(corpus3d, corpusText) {
         },
     };
 
-    Plotly.newPlot(plotElement, [trace], layout);
+    const originTrace = {
+        x: [0],
+        y: [0],
+        z: [0],
+        mode: 'markers',
+        type: 'scatter3d',
+        name: 'Origin',
+        hoverinfo: 'none',
+        marker: {
+            size: 4,
+            color: 'black',
+            symbol: 'circle'
+        }
+    };
+
+    Plotly.newPlot(plotElement, [corpusTrace, originTrace], layout);
 }
 
 /**
