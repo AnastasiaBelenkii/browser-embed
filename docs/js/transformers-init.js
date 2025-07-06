@@ -10,9 +10,17 @@ const worker = new Worker(new URL('./embedding-worker.js', import.meta.url), {
 // This helps components that load late handle the case where the 'model-ready' event was already dispatched.
 export let modelReady = false;
 
-// Store promises for embedding requests
-const embeddingPromises = new Map();
+// Store promises for all types of requests
+const promises = new Map();
 let nextId = 0;
+
+function makeRequest(payload) {
+    const id = nextId++;
+    return new Promise((resolve, reject) => {
+        promises.set(id, { resolve, reject });
+        worker.postMessage({ ...payload, id });
+    });
+}
 
 /**
  * A function to request an embedding from the worker.
@@ -20,45 +28,58 @@ let nextId = 0;
  * @returns {Promise<any>} A promise that resolves with the embedding result.
  */
 export function requestEmbedding(text) {
-    const id = nextId++;
-    return new Promise((resolve, reject) => {
-        // Store the promise resolvers
-        embeddingPromises.set(id, { resolve, reject });
-        // Post the message to the worker
-        worker.postMessage({ type: 'embed', text, id });
-    });
+    return makeRequest({ type: 'embed', text });
 }
+
+/**
+ * Requests that the worker perform dimensionality reduction on the entire corpus.
+ * @param {object} embedding The full corpus embedding object from a previous request.
+ * @returns {Promise<number[][]>} A promise that resolves with the 3D coordinates.
+ */
+export function requestCorpusReduction(embedding) {
+    return makeRequest({ type: 'reduceCorpus', embedding });
+}
+
+/**
+ * Requests that the worker project a single query embedding into the existing 3D space.
+ * @param {object} embedding The query embedding object.
+ * @returns {Promise<number[][]>} A promise that resolves with the single 3D coordinate.
+ */
+export function requestQueryProjection(embedding) {
+    return makeRequest({ type: 'projectQuery', embedding });
+}
+
 
 // Listen for messages from the worker
 worker.onmessage = (event) => {
-    const { type, id, embedding, error } = event.data;
+    const { type, id, error } = event.data;
+    const promise = promises.get(id);
+
+    if (!promise) return;
 
     switch (type) {
         case 'ready':
-            // The model is loaded and ready. Update state and notify the application.
             console.log('Embedding worker is ready.');
             modelReady = true;
             document.dispatchEvent(new CustomEvent('model-ready'));
             break;
         
         case 'complete':
-            // An embedding request was completed successfully.
-            if (embeddingPromises.has(id)) {
-                embeddingPromises.get(id).resolve(embedding);
-                embeddingPromises.delete(id);
-            }
+        case 'corpusReduced':
+        case 'queryProjected':
+            // These are all success cases that return data.
+            // The specific data is in event.data (e.g., embedding, corpus3D, query3D)
+            promise.resolve(event.data[Object.keys(event.data).find(k => k !== 'type' && k !== 'id')]);
+            promises.delete(id);
             break;
 
         case 'error':
-            // An error occurred in the worker.
             console.error('Worker error:', error);
-            // If it's a general error, notify the whole app.
             if (id === undefined) {
                 document.dispatchEvent(new CustomEvent('model-error', { detail: error }));
-            } else if (embeddingPromises.has(id)) {
-                // If it's an error for a specific request, reject that promise.
-                embeddingPromises.get(id).reject(new Error(error));
-                embeddingPromises.delete(id);
+            } else {
+                promise.reject(new Error(error));
+                promises.delete(id);
             }
             break;
     }

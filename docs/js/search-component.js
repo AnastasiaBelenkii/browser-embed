@@ -1,5 +1,6 @@
 // Import the function to interact with the embedding worker and the model ready state
-import { requestEmbedding, modelReady } from './transformers-init.js';
+import { requestEmbedding, modelReady, requestCorpusReduction, requestQueryProjection } from './transformers-init.js';
+import { initializeVisualization, plotCorpus, plotQuery, highlightPoint } from './visualization-component.js';
 
 // --- State and Data ---
 const CORPUS = [
@@ -25,10 +26,11 @@ function getDOMElements() {
     const spinner = document.getElementById('spinner');
     const corpusDiv = document.getElementById('corpus-container');
     const queryDiv = document.getElementById('query-container');
-    if (!button || !input || !spinner || !corpusDiv || !queryDiv) {
+    const vizContainer = document.getElementById('visualization-container');
+    if (!button || !input || !spinner || !corpusDiv || !queryDiv || !vizContainer) {
         return null;
     }
-    return { button, input, spinner, corpusDiv, queryDiv };
+    return { button, input, spinner, corpusDiv, queryDiv, vizContainer };
 }
 
 function setUIState(state) {
@@ -133,6 +135,8 @@ function highlightTopResult(searchResults) {
             topItem.classList.add('highlight');
             topScore.textContent = `Similarity: ${topResult.score.toFixed(4)}`;
         }
+        // Highlight the point on the 3D graph
+        highlightPoint(topResult.index);
     }
 }
 
@@ -144,8 +148,8 @@ function cosineSimilarity(vecA, vecB) {
     let normB = 0;
     for (let i = 0; i < vecA.length; i++) {
         dotProduct += vecA[i] * vecB[i];
-        normA += vecA[i] * vecA[i];
         normB += vecB[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
     }
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
@@ -166,6 +170,10 @@ async function handleSearch() {
     const queryEmbedding = await requestEmbedding(query);
     renderQueryEmbedding(query, queryEmbedding);
 
+    // Project the query into the 3D space and plot it
+    const query3D = await requestQueryProjection(queryEmbedding);
+    plotQuery(query3D[0], query);
+
     // Perform the search
     const searchResults = [];
     for (let i = 0; i < CORPUS.length; i++) {
@@ -178,7 +186,7 @@ async function handleSearch() {
     // Sort results by score
     searchResults.sort((a, b) => b.score - a.score);
 
-    // Highlight the top result in the UI
+    // Highlight the top result in the UI and on the graph
     highlightTopResult(searchResults);
     
   } catch (error) {
@@ -195,14 +203,21 @@ async function handleSearch() {
  * This function is called when the model is ready. It indexes the corpus.
  */
 async function onModelReady() {
-    // Pre-compute embeddings for the corpus via the worker
     setUIState('indexing');
     try {
+        // 1. Pre-compute embeddings for the corpus
         corpusEmbeddings = await requestEmbedding(CORPUS);
         renderCorpus();
+
+        // 2. Reduce dimensionality for visualization
+        const corpus3D = await requestCorpusReduction(corpusEmbeddings);
+        
+        // 3. Plot the 3D corpus
+        plotCorpus(corpus3D, CORPUS);
+
         setUIState('ready');
     } catch (error) {
-        console.error('Corpus indexing failed:', error);
+        console.error('Corpus indexing or visualization failed:', error);
         setUIState('error');
     }
 }
@@ -247,6 +262,7 @@ export function initializeSearchComponent() {
         }
 
         setUIState('loadingModel');
+        initializeVisualization('visualization-container');
         setupEventListeners();
 
         // This handles the race condition where the model might be ready
