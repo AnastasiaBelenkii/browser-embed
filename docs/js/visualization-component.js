@@ -73,7 +73,8 @@ export function initializeVisualization(elementId) {
     const width = container.clientWidth;
     const height = container.clientHeight || 500;
 
-    camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+    // Adjust camera's near clipping plane to prevent objects from disappearing on zoom
+    camera = new THREE.PerspectiveCamera(75, width / height, 0.001, 1000);
     camera.position.set(1, 1, 1);
     camera.lookAt(0, 0, 0);
 
@@ -138,7 +139,8 @@ function animate() {
 
     // Camera-aware label scaling
     if (labelsGroup) {
-        const scaleFactor = 0.1; // Adjust this factor to control apparent size
+        // Reduced scaleFactor to make labels smaller
+        const scaleFactor = 0.05;
         labelsGroup.children.forEach(label => {
             const distance = label.position.distanceTo(camera.position);
             const scale = distance * scaleFactor;
