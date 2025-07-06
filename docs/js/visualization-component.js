@@ -3,9 +3,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // --- Three.js Module-level variables ---
 let scene, camera, renderer, controls;
-let corpusVectorsGroup, queryVectorGroup;
+let corpusVectorsGroup, queryVectorGroup, labelsGroup, axesHelper;
 let raycaster, pointer, tooltipElement;
 let currentlyIntersected, currentlyHighlighted;
+let maxVectorLength = 1; // Default scale
 
 // --- Constants ---
 const BASE_COLOR = 0x1f77b4; // Muted blue
@@ -22,7 +23,6 @@ function createAxisLabel(text, position) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     
-    // Use a large, fixed font size to generate a crisp texture.
     const fontSize = 64;
     context.font = `Bold ${fontSize}px Arial`;
     
@@ -31,10 +31,9 @@ function createAxisLabel(text, position) {
     canvas.width = textWidth;
     canvas.height = fontSize;
 
-    // Font settings must be reset after canvas resizing
     context.font = `Bold ${fontSize}px Arial`;
     context.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    context.fillText(text, 0, fontSize - 10); // Adjust vertical alignment
+    context.fillText(text, 0, fontSize - 10);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.minFilter = THREE.LinearFilter;
@@ -48,12 +47,11 @@ function createAxisLabel(text, position) {
 
     const sprite = new THREE.Sprite(material);
     
-    // Control the final size in the 3D scene by adjusting the scale.
-    const spriteScale = 0.10;
-    sprite.scale.set(spriteScale * (canvas.width / canvas.height), spriteScale, 1);
+    // Store aspect ratio for dynamic scaling
+    sprite.userData.aspect = canvas.width / canvas.height;
 
     sprite.position.copy(position);
-    scene.add(sprite);
+    labelsGroup.add(sprite);
 }
 
 
@@ -70,10 +68,10 @@ export function initializeVisualization(elementId) {
 
     // --- Basic Scene Setup ---
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xffffff); // White background
+    scene.background = new THREE.Color(0xffffff);
 
     const width = container.clientWidth;
-    const height = container.clientHeight || 500; // Fallback height
+    const height = container.clientHeight || 500;
 
     camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
     camera.position.set(1, 1, 1);
@@ -94,38 +92,18 @@ export function initializeVisualization(elementId) {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(5, 10, 7.5);
     scene.add(directionalLight);
-
-    // --- Axes Helper ---
-    const axesHelper = new THREE.AxesHelper(1); // Length of 1 unit
-    scene.add(axesHelper);
     
     // --- Origin Marker ---
     const originGeometry = new THREE.SphereGeometry(0.002, 16, 16);
-    const originMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Black
+    const originMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
     const origin = new THREE.Mesh(originGeometry, originMaterial);
     scene.add(origin);
-
-    // --- Axis Labels ---
-    const labels = [0.5, 1.0];
-    const labelOffset = 0.03; // To prevent z-fighting with axis line
-    labels.forEach(val => {
-        // X-axis
-        createAxisLabel(val.toString(), new THREE.Vector3(val, labelOffset, 0));
-        createAxisLabel((-val).toString(), new THREE.Vector3(-val, labelOffset, 0));
-        // Y-axis
-        createAxisLabel(val.toString(), new THREE.Vector3(labelOffset, val, 0));
-        createAxisLabel((-val).toString(), new THREE.Vector3(labelOffset, -val, 0));
-        // Z-axis
-        createAxisLabel(val.toString(), new THREE.Vector3(labelOffset, 0, val));
-        createAxisLabel((-val).toString(), new THREE.Vector3(labelOffset, 0, -val));
-    });
-
 
     // --- Raycasting for Tooltips ---
     raycaster = new THREE.Raycaster();
     pointer = new THREE.Vector2();
     tooltipElement = document.createElement('div');
-    tooltipElement.className = 'tooltip'; // Add a class for styling
+    tooltipElement.className = 'tooltip';
     document.body.appendChild(tooltipElement);
 
     // --- Tooltip CSS ---
@@ -138,7 +116,7 @@ export function initializeVisualization(elementId) {
             background-color: rgba(0, 0, 0, 0.75);
             color: white;
             border-radius: 4px;
-            pointer-events: none; /* So it doesn't interfere with other mouse events */
+            pointer-events: none;
             font-family: sans-serif;
             font-size: 14px;
             z-index: 100;
@@ -157,6 +135,18 @@ export function initializeVisualization(elementId) {
 function animate() {
     requestAnimationFrame(animate);
     controls.update();
+
+    // Camera-aware label scaling
+    if (labelsGroup) {
+        const scaleFactor = 0.1; // Adjust this factor to control apparent size
+        labelsGroup.children.forEach(label => {
+            const distance = label.position.distanceTo(camera.position);
+            const scale = distance * scaleFactor;
+            const aspect = label.userData.aspect || 1;
+            label.scale.set(scale * aspect, scale, 1);
+        });
+    }
+
     renderer.render(scene, camera);
 }
 
@@ -177,11 +167,9 @@ function onPointerMove(event) {
     if (!container) return;
     const rect = container.getBoundingClientRect();
 
-    // Update pointer vector
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 
-    // Perform raycasting only on mouse move
     raycaster.setFromCamera(pointer, camera);
     const objectsToIntersect = corpusVectorsGroup ? corpusVectorsGroup.children : [];
     const intersects = raycaster.intersectObjects(objectsToIntersect, true);
@@ -209,29 +197,26 @@ function onPointerMove(event) {
  */
 function createVector(point, color, text, isQuery = false) {
     const endPoint = new THREE.Vector3(...point);
+    const vectorLength = endPoint.length();
     
-    // Line part
     const points = [new THREE.Vector3(0, 0, 0), endPoint];
     const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
     const lineMaterial = new THREE.LineBasicMaterial({ color });
     const line = new THREE.Line(lineGeometry, lineMaterial);
 
-    // Arrowhead part
-    const coneHeight = 0.007;
-    const coneRadius = 0.0025;
+    // Make arrowhead size relative to vector length
+    const coneHeight = vectorLength * 0.07;
+    const coneRadius = vectorLength * 0.025;
     const markerGeometry = new THREE.ConeGeometry(coneRadius, coneHeight, 8);
-    // Move the cone's pivot to its tip
     markerGeometry.translate(0, -coneHeight / 2, 0);
 
     const markerMaterial = new THREE.MeshStandardMaterial({ color });
     const marker = new THREE.Mesh(markerGeometry, markerMaterial);
 
-    // Orient the cone to point in the vector's direction
     const direction = endPoint.clone().normalize();
-    const up = new THREE.Vector3(0, 1, 0); // Default orientation of ConeGeometry
+    const up = new THREE.Vector3(0, 1, 0);
     marker.quaternion.setFromUnitVectors(up, direction);
     
-    // Position the cone's tip at the end of the vector
     marker.position.copy(endPoint);
     
     marker.userData.text = text;
@@ -255,17 +240,53 @@ function createVector(point, color, text, isQuery = false) {
  * @param {string[]} corpusText - The original text for hover info.
  */
 export function plotCorpus(corpus3d, corpusText) {
-    if (corpusVectorsGroup) {
-        scene.remove(corpusVectorsGroup);
-    }
-    corpusVectorsGroup = new THREE.Group();
+    // --- 1. Clear old data-driven objects ---
+    if (corpusVectorsGroup) scene.remove(corpusVectorsGroup);
+    if (labelsGroup) scene.remove(labelsGroup);
+    if (axesHelper) scene.remove(axesHelper);
 
+    // --- 2. Calculate new scene scale ---
+    const lengths = corpus3d.map(p => new THREE.Vector3(...p).length());
+    maxVectorLength = Math.max(...lengths);
+    if (maxVectorLength === 0 || !isFinite(maxVectorLength)) maxVectorLength = 1;
+
+    // --- 3. Create new groups and helpers based on scale ---
+    corpusVectorsGroup = new THREE.Group();
+    labelsGroup = new THREE.Group();
+    axesHelper = new THREE.AxesHelper(maxVectorLength);
+    scene.add(axesHelper);
+
+    // --- 4. Create new scaled labels ---
+    const labelValues = [0.5, 1.0];
+    const labelOffset = maxVectorLength * 0.03;
+    labelValues.forEach(val => {
+        const pos = maxVectorLength * val;
+        // X-axis
+        createAxisLabel(pos.toFixed(1), new THREE.Vector3(pos, labelOffset, 0));
+        createAxisLabel((-pos).toFixed(1), new THREE.Vector3(-pos, labelOffset, 0));
+        // Y-axis
+        createAxisLabel(pos.toFixed(1), new THREE.Vector3(labelOffset, pos, 0));
+        createAxisLabel((-pos).toFixed(1), new THREE.Vector3(labelOffset, -pos, 0));
+        // Z-axis
+        createAxisLabel(pos.toFixed(1), new THREE.Vector3(labelOffset, 0, pos));
+        createAxisLabel((-pos).toFixed(1), new THREE.Vector3(labelOffset, 0, -pos));
+    });
+    const axisNameOffset = maxVectorLength * 1.1;
+    createAxisLabel('X', new THREE.Vector3(axisNameOffset, 0, 0));
+    createAxisLabel('Y', new THREE.Vector3(0, axisNameOffset, 0));
+    createAxisLabel('Z', new THREE.Vector3(0, 0, axisNameOffset));
+
+    // --- 5. Plot the vectors ---
     corpus3d.forEach((p, i) => {
         const vector = createVector(p, BASE_COLOR, corpusText[i]);
         corpusVectorsGroup.add(vector);
     });
-
     scene.add(corpusVectorsGroup);
+    scene.add(labelsGroup);
+
+    // --- 6. Adjust camera to frame the new scene ---
+    camera.position.set(maxVectorLength, maxVectorLength, maxVectorLength);
+    camera.lookAt(0, 0, 0);
 }
 
 /**
