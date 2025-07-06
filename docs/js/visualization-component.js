@@ -97,7 +97,6 @@ export function initializeVisualization(elementId) {
 function animate() {
     requestAnimationFrame(animate);
     controls.update();
-    handleIntersections();
     renderer.render(scene, camera);
 }
 
@@ -115,15 +114,17 @@ function onWindowResize() {
 
 function onPointerMove(event) {
     const container = renderer.domElement.parentElement;
+    if (!container) return;
     const rect = container.getBoundingClientRect();
+
+    // Update pointer vector
     pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-}
 
-function handleIntersections() {
+    // Perform raycasting only on mouse move
     raycaster.setFromCamera(pointer, camera);
-    const intersects = raycaster.intersectObjects(corpusVectorsGroup ? corpusVectorsGroup.children : [], true);
-
+    const objectsToIntersect = corpusVectorsGroup ? corpusVectorsGroup.children : [];
+    const intersects = raycaster.intersectObjects(objectsToIntersect, true);
     const vectorHeadIntersects = intersects.filter(i => i.object.userData.isVectorHead);
 
     if (vectorHeadIntersects.length > 0) {
