@@ -1,7 +1,6 @@
 ---
 title: Interactive Semantic Search
 description: Understanding embeddings through visualization
-date: 2024-01-15
 ---
 
 # Interactive Semantic Search

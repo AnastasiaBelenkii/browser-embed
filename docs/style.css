@@ -12,6 +12,40 @@ h1,h2,h3 {
     line-height: 1.2
 }
 
+/* Navigation styles - ultra lightweight */
+#blog-nav {
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+#blog-nav a {
+    margin-right: 1rem;
+    text-decoration: none;
+    color: #007bff;
+    font-size: 0.9rem;
+}
+
+#blog-nav a:hover {
+    text-decoration: underline;
+}
+
+/* Post header styles */
+.post-header {
+    margin-bottom: 2rem;
+}
+
+.post-title {
+    margin-bottom: 0.5rem;
+}
+
+.post-description {
+    font-size: 1.1rem;
+    color: #666;
+    font-style: italic;
+    margin-bottom: 0;
+}
+
 /* General-purpose spinner */
 .spinner {
     border: 4px solid rgba(0, 0, 0, 0.1);
@@ -143,6 +177,18 @@ h1,h2,h3 {
 
     a:visited {
         color: #8e96f0
+    }
+
+    #blog-nav {
+        border-bottom-color: #30363d;
+    }
+
+    #blog-nav a {
+        color: #58a6ff;
+    }
+
+    .post-description {
+        color: #8b949e;
     }
 
     /* Adjust spinner color for dark mode */

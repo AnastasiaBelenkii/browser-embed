@@ -45,7 +45,22 @@ export class BlogSystem {
         const html = this.markdownProcessor.parse(content);
         
         document.title = frontmatter.title || 'Interactive ML Blog';
-        document.querySelector('.content').innerHTML = html;
+        
+        // Build the full content with frontmatter header
+        let fullContent = '';
+        if (frontmatter.title || frontmatter.description) {
+            fullContent += '<header class="post-header">';
+            if (frontmatter.title) {
+                fullContent += `<h1 class="post-title">${frontmatter.title}</h1>`;
+            }
+            if (frontmatter.description) {
+                fullContent += `<p class="post-description">${frontmatter.description}</p>`;
+            }
+            fullContent += '</header>';
+        }
+        fullContent += html;
+        
+        document.querySelector('.content').innerHTML = fullContent;
         
         // Initialize any interactive components mentioned in the post
         this.initializeInteractiveComponents(postId);
@@ -55,8 +70,11 @@ export class BlogSystem {
         // Fallback content for when markdown files aren't found
         if (postId === 'semantic-search') {
             document.querySelector('.content').innerHTML = `
+                <header class="post-header">
+                    <h1 class="post-title">Interactive Semantic Search</h1>
+                    <p class="post-description">Understanding embeddings through visualization</p>
+                </header>
                 <section>
-                    <h1>Interactive Semantic Search</h1>
                     <p>My attempt to wrap my head around embeddings and semantic search.</p>
                     
                     <div class="search-container">
