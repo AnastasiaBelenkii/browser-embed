@@ -1,11 +1,6 @@
 ---
-title: Interactive Semantic Search
 description: Understanding embeddings through visualization
 ---
-
-# Interactive Semantic Search
-
-My attempt to wrap my head around embeddings and semantic search.
 
 ## What are Embeddings?
 

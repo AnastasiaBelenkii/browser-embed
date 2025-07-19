@@ -2,6 +2,12 @@
 
 SUPER in Progress. Everything below is hopes and dreams (:
 
+---
+
+edit--- actually, this is turning into just being the start of a personal blog and will likely eventually by migrated to "personal" github pages rather than living in this repo. But I am doing the same work for the semantic search here for now either way, so leaving the old README below. Might add some small details on blog architecture once I think them through better.
+
+---
+
 ## Project Goals
 
 A fully client-side semantic search engine that:
