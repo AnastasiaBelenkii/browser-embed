@@ -30,12 +30,12 @@ export class BlogSystem {
                 const markdown = await response.text();
                 this.renderPost(markdown, hash);
             } else {
-                // Fallback to current index.html content
-                this.renderCurrentContent();
+                // Fallback to default content if markdown file not found
+                this.renderFallbackContent(hash);
             }
         } catch (error) {
-            console.log('Markdown not found, using current content');
-            this.renderCurrentContent();
+            console.log('Markdown not found, using fallback content');
+            this.renderFallbackContent(hash);
         }
     }
 
@@ -50,9 +50,47 @@ export class BlogSystem {
         this.initializeInteractiveComponents(postId);
     }
 
-    renderCurrentContent() {
-        // Keep existing content and functionality
-        this.initializeInteractiveComponents('semantic-search');
+    renderFallbackContent(postId) {
+        // Fallback content for when markdown files aren't found
+        if (postId === 'semantic-search') {
+            document.querySelector('.content').innerHTML = `
+                <section>
+                    <h1>Interactive Semantic Search</h1>
+                    <p>My attempt to wrap my head around embeddings and semantic search.</p>
+                    
+                    <div class="search-container">
+                        <input
+                            type="text"
+                            id="search-input"
+                            placeholder="Loading model..."
+                            aria-label="Semantic search query"
+                            disabled
+                        />
+                        <button id="search-button" disabled>Search</button>
+                        <div id="spinner" class="spinner"></div>
+                    </div>
+
+                    <div id="query-container"></div>
+                    <div id="corpus-container"></div>
+                </section>
+                
+                <section>
+                    <p>This demonstration runs entirely client-side, with no server processing.</p>
+                    <p>Stay tuned as I add more functionality!</p>
+                </section>
+            `;
+        } else {
+            document.querySelector('.content').innerHTML = `
+                <section>
+                    <h1>Page Not Found</h1>
+                    <p>The requested post "${postId}" was not found.</p>
+                    <p><a href="#semantic-search">Return to Semantic Search Demo</a></p>
+                </section>
+            `;
+        }
+        
+        // Initialize components for the fallback content
+        this.initializeInteractiveComponents(postId);
     }
 
     initializeInteractiveComponents(postId) {
@@ -64,6 +102,9 @@ export class BlogSystem {
     }
 
     async initializeSemanticSearch() {
+        // Small delay to ensure DOM is ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Dynamically import and initialize only when needed
         const { initializeSearchComponent } = await import('./search-component.js');
         initializeSearchComponent();
