@@ -4,22 +4,31 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <meta name="description" content="Client-side semantic search using embeddings" />
+  <meta name="description" content="Interactive ML blog with client-side demonstrations" />
   <meta name="theme-color" content="#ffffff" />
-  <title>In Browser Semantic Search</title>
+  <title>Interactive ML Blog</title>
   <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+      }
+    }
+  </script>
   <script type="module" src="js/transformers-init.js"></script>
 </head>
 <body>
 <header id="title-block-header">
-<h1 class="title">In Browser Semantic Search</h1>
+  <nav id="blog-nav"></nav>
+  <h1 class="title" id="blog-title">Interactive ML Blog</h1>
 </header>
 
 <article class="content">
+  <!-- Content will be dynamically loaded here -->
   <section>
     <p>My attempt to wrap my head around embeddings and semantic search.</p>
     
-    <!-- Search component HTML is now directly here -->
     <div class="search-container">
       <input
         type="text"
@@ -41,16 +50,24 @@
     <p>Stay tuned as I add more functionality!</p>
   </section>
 </article>
-<p><a
-href="https://github.com/AnastasiaBelenkii/browser-embed" target="_blank" rel="noopener noreferrer">Code</a></p>
-<p>Email me at anastasia@belenky.net with thoughts, feelings,
-unsolicited advice, and technical suggestions. Anything at all.
-Please.</p>
 
-<!-- Initialize the search component -->
+<footer>
+  <p><a href="https://github.com/AnastasiaBelenkii/browser-embed" target="_blank" rel="noopener noreferrer">Code</a></p>
+  <p>Email me at anastasia@belenky.net with thoughts, feelings, unsolicited advice, and technical suggestions. Anything at all. Please.</p>
+</footer>
+
 <script type="module">
+  import { BlogSystem } from './js/blog-system.js';
   import { initializeSearchComponent } from './js/search-component.js';
-  initializeSearchComponent();
+  
+  // Initialize blog system if hash routing is detected, otherwise use current system
+  if (window.location.hash && window.location.hash !== '#semantic-search') {
+    const blog = new BlogSystem();
+    blog.initialize();
+  } else {
+    // Keep current behavior for default/semantic-search
+    initializeSearchComponent();
+  }
 </script>
 </body>
 </html>
