@@ -239,7 +239,15 @@ function setupEventListeners() {
     });
 }
 
+// Component lifecycle management for better organization
+let isInitialized = false;
+
 export function initializeSearchComponent() {
+    if (isInitialized) {
+        console.warn('Search component already initialized');
+        return;
+    }
+
     try {
         const elements = getDOMElements();
         if (!elements) {
@@ -262,6 +270,8 @@ export function initializeSearchComponent() {
             setUIState('error');
         });
 
+        isInitialized = true;
+
     } catch (error) {
         console.error('CRITICAL: Failed to initialize search component:', error);
         const container = document.querySelector('.search-container');
@@ -270,3 +280,12 @@ export function initializeSearchComponent() {
         }
     }
 }
+
+// Cleanup function for better lifecycle management
+export function cleanup() {
+    isInitialized = false;
+    // Could add more cleanup here if needed
+}
+
+// Expose initialize function as the default for the component registry
+export const initialize = initializeSearchComponent;

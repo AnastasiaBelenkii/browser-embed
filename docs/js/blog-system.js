@@ -1,73 +1,94 @@
-// Simple client-side blog system that doesn't interfere with performance
+// Simplified blog system focused on routing and orchestration
+import { BLOG_CONFIG } from './config.js';
+import { MarkdownProcessor } from './core/markdown-processor.js';
+import { contentLoader } from './core/content-loader.js';
+import { componentRegistry } from './core/component-registry.js';
+import { perf } from './utils/performance.js';
+
 export class BlogSystem {
     constructor() {
         this.currentPost = null;
-        this.markdownProcessor = null;
+        this.markdownProcessor = new MarkdownProcessor();
+        this.isInitialized = false;
     }
 
     async initialize() {
-        // Lazy load markdown processor only when needed
-        if (!this.markdownProcessor) {
-            const { marked } = await import('https://cdn.jsdelivr.net/npm/marked@9.1.6/lib/marked.esm.js');
-            this.markdownProcessor = marked;
-        }
+        if (this.isInitialized) return;
         
-        this.setupRouting();
-        this.loadCurrentPost();
+        await perf.measureAsync('Blog system initialization', async () => {
+            await this.markdownProcessor.initialize();
+            this.setupRouting();
+            await this.loadCurrentPost();
+            this.isInitialized = true;
+        });
     }
 
     setupRouting() {
         // Hash-based routing for GitHub Pages compatibility
         window.addEventListener('hashchange', () => this.loadCurrentPost());
+        
+        // Handle browser back/forward buttons
+        window.addEventListener('popstate', () => this.loadCurrentPost());
     }
 
     async loadCurrentPost() {
-        const hash = window.location.hash.slice(1) || 'semantic-search';
+        const hash = window.location.hash.slice(1) || BLOG_CONFIG.defaultPost;
+        
+        // Don't reload if we're already on this post
+        if (this.currentPost === hash) return;
         
         try {
-            // Fix path - content directory is at root level, not inside docs
-            const response = await fetch(`../content/${hash}.md`);
-            if (response.ok) {
-                const markdown = await response.text();
-                this.renderPost(markdown, hash);
-            } else {
-                // Fallback to default content if markdown file not found
-                this.renderFallbackContent(hash);
-            }
+            await this.renderPost(hash);
+            this.currentPost = hash;
         } catch (error) {
+            console.error(`Failed to load post '${hash}':`, error);
+            await this.renderErrorPage(hash, error);
+        }
+    }
+
+    async renderPost(postId) {
+        try {
+            // Try to load markdown content
+            const contentPath = `../content/${postId}.md`;
+            const markdown = await contentLoader.loadContent(contentPath);
+            const { frontmatter, html } = await this.markdownProcessor.processMarkdown(markdown);
+            
+            // Update document title
+            const title = frontmatter.title || BLOG_CONFIG.posts[postId]?.title || BLOG_CONFIG.title;
+            document.title = title;
+            
+            // Build and render content
+            const header = this.markdownProcessor.buildPostHeader(frontmatter);
+            const fullContent = header + html;
+            document.querySelector('.content').innerHTML = fullContent;
+            
+            // Initialize interactive components
+            await this.initializePostComponents(postId, frontmatter);
+            
+        } catch (error) {
+            // Fall back to hardcoded content if markdown fails
             console.log('Markdown not found, using fallback content');
-            this.renderFallbackContent(hash);
+            await this.renderFallbackContent(postId);
         }
     }
 
-    renderPost(markdown, postId) {
-        const { frontmatter, content } = this.parseFrontmatter(markdown);
-        const html = this.markdownProcessor.parse(content);
-        
-        document.title = frontmatter.title || 'Interactive ML Blog';
-        
-        // Build the full content with frontmatter header
-        let fullContent = '';
-        if (frontmatter.title || frontmatter.description) {
-            fullContent += '<header class="post-header">';
-            if (frontmatter.title) {
-                fullContent += `<h1 class="post-title">${frontmatter.title}</h1>`;
-            }
-            if (frontmatter.description) {
-                fullContent += `<p class="post-description">${frontmatter.description}</p>`;
-            }
-            fullContent += '</header>';
+    async initializePostComponents(postId, frontmatter) {
+        const postConfig = BLOG_CONFIG.posts[postId];
+        if (!postConfig?.component) {
+            console.log(`No interactive component configured for post '${postId}'`);
+            return;
         }
-        fullContent += html;
-        
-        document.querySelector('.content').innerHTML = fullContent;
-        
-        // Initialize any interactive components mentioned in the post
-        this.initializeInteractiveComponents(postId);
+
+        try {
+            await componentRegistry.initializeComponent(postConfig.component);
+        } catch (error) {
+            console.error(`Failed to initialize component '${postConfig.component}':`, error);
+        }
     }
 
-    renderFallbackContent(postId) {
-        // Fallback content for when markdown files aren't found
+    async renderFallbackContent(postId) {
+        const postConfig = BLOG_CONFIG.posts[postId];
+        
         if (postId === 'semantic-search') {
             document.querySelector('.content').innerHTML = `
                 <header class="post-header">
@@ -98,58 +119,34 @@ export class BlogSystem {
                     <p>Stay tuned as I add more functionality!</p>
                 </section>
             `;
-        } else {
-            document.querySelector('.content').innerHTML = `
-                <section>
-                    <h1>Page Not Found</h1>
-                    <p>The requested post "${postId}" was not found.</p>
-                    <p><a href="#semantic-search">Return to Semantic Search Demo</a></p>
-                </section>
-            `;
-        }
-        
-        // Initialize components for the fallback content
-        this.initializeInteractiveComponents(postId);
-    }
-
-    initializeInteractiveComponents(postId) {
-        // Only initialize components needed for this post
-        if (postId === 'semantic-search') {
-            // This is where your current search component gets initialized
-            this.initializeSemanticSearch();
-        }
-    }
-
-    async initializeSemanticSearch() {
-        // Small delay to ensure DOM is ready
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Dynamically import and initialize only when needed
-        const { initializeSearchComponent } = await import('./search-component.js');
-        initializeSearchComponent();
-    }
-
-    parseFrontmatter(markdown) {
-        const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/;
-        const match = markdown.match(frontmatterRegex);
-        
-        if (match) {
-            const frontmatterText = match[1];
-            const content = match[2];
-            const frontmatter = {};
             
-            frontmatterText.split('\n').forEach(line => {
-                const colonIndex = line.indexOf(':');
-                if (colonIndex > -1) {
-                    const key = line.slice(0, colonIndex).trim();
-                    const value = line.slice(colonIndex + 1).trim().replace(/['"]/g, '');
-                    frontmatter[key] = value;
+            // Initialize the component
+            if (postConfig?.component) {
+                try {
+                    await componentRegistry.initializeComponent(postConfig.component);
+                } catch (error) {
+                    console.error(`Failed to initialize fallback component:`, error);
                 }
-            });
-            
-            return { frontmatter, content };
+            }
+        } else {
+            await this.renderErrorPage(postId, new Error('Post not found'));
         }
-        
-        return { frontmatter: {}, content: markdown };
+    }
+
+    async renderErrorPage(postId, error) {
+        document.querySelector('.content').innerHTML = `
+            <section>
+                <h1>Page Not Found</h1>
+                <p>The requested post "${postId}" was not found.</p>
+                <p><strong>Error:</strong> ${error.message}</p>
+                <p><a href="#${BLOG_CONFIG.defaultPost}">Return to ${BLOG_CONFIG.posts[BLOG_CONFIG.defaultPost]?.title || 'Home'}</a></p>
+            </section>
+        `;
+    }
+
+    // Cleanup method for when we eventually migrate to Svelte
+    cleanup() {
+        componentRegistry.cleanupAll();
+        contentLoader.clearCache();
     }
 }
