@@ -25,7 +25,8 @@ export class BlogSystem {
         const hash = window.location.hash.slice(1) || 'semantic-search';
         
         try {
-            const response = await fetch(`content/${hash}.md`);
+            // Fix path - content directory is at root level, not inside docs
+            const response = await fetch(`../content/${hash}.md`);
             if (response.ok) {
                 const markdown = await response.text();
                 this.renderPost(markdown, hash);
