@@ -37,6 +37,7 @@
   let isIndexing = false;
   let isSearching = false;
   let hasError = false;
+  let isTyping = false; // New state to show immediate feedback
   /** @type {Embedding | null} */
   let corpusEmbeddings = null;
   /** @type {SearchResult[]} */
@@ -81,6 +82,7 @@
 
     try {
       isSearching = true;
+      isTyping = false; // Clear typing state when actual search starts
       
       // Generate embedding for the user's query
       queryEmbedding = await requestEmbedding(searchInput.trim());
@@ -139,9 +141,11 @@
     searchInput = '';
     searchResults = [];
     queryEmbedding = null;
+    isTyping = false;
+    if (searchTimeout) clearTimeout(searchTimeout);
   }
 
-  // Debounced search function
+  // Debounced search function with faster response
   let searchTimeout;
   function handleInput() {
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -149,12 +153,19 @@
     if (!searchInput.trim()) {
       searchResults = [];
       queryEmbedding = null;
+      isTyping = false;
       return;
     }
     
+    // Show immediate typing feedback
+    if (canSearch) {
+      isTyping = true;
+    }
+    
+    // Reduced debounce time for better responsiveness
     searchTimeout = setTimeout(() => {
       performSearch();
-    }, 300); // 300ms debounce
+    }, 150); // Reduced from 300ms to 150ms
   }
 
   onMount(async () => {
@@ -220,8 +231,8 @@
       </button>
     {/if}
   </div>
-  {#if isModelLoading || isIndexing || isSearching}
-    <div class="spinner"></div>
+  {#if isModelLoading || isIndexing || isSearching || isTyping}
+    <div class="spinner" class:typing={isTyping}></div>
   {/if}
 </div>
 
@@ -348,6 +359,11 @@
     flex-shrink: 0;
   }
 
+  .spinner.typing {
+    border-left-color: #28a745;
+    animation: spin 0.6s linear infinite;
+  }
+
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
@@ -439,6 +455,10 @@
 
     .spinner {
       border-left-color: #58a6ff;
+    }
+
+    .spinner.typing {
+      border-left-color: #7c3aed;
     }
 
     .corpus-item, .query-item {
