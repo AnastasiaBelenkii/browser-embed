@@ -4,18 +4,18 @@
   const posts = [
     {
       slug: 'semantic-search',
-      title: 'Interactive Semantic Search',
+      title: 'Semantic Search',
       description: 'Understanding embeddings through visualization'
     }
   ];
 </script>
 
 <svelte:head>
-  <title>Interactive ML Blog</title>
+  <title>Explorations</title>
 </svelte:head>
 
 <header class="post-header">
-  <h1 class="post-title">Interactive ML Blog</h1>
+  <h1 class="post-title">Explorations</h1>
   <p class="post-description">Exploring machine learning concepts through interactive demonstrations</p>
 </header>
 

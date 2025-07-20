@@ -13,7 +13,7 @@
     <a href="{base}/">Home</a>
     <a href="{base}/semantic-search">Semantic Search</a>
   </nav>
-  <h1 class="title">Interactive ML Blog</h1>
+  <h1 class="title">Explorations</h1>
 </header>
 
 <article class="content">
