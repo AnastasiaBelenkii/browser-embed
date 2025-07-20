@@ -145,27 +145,33 @@
     if (searchTimeout) clearTimeout(searchTimeout);
   }
 
-  // Debounced search function with faster response
+  // Debounced search function optimized for immediate input response
   let searchTimeout;
   function handleInput() {
+    // Only do minimal synchronous work to avoid blocking input
     if (searchTimeout) clearTimeout(searchTimeout);
     
-    if (!searchInput.trim()) {
-      searchResults = [];
-      queryEmbedding = null;
-      isTyping = false;
-      return;
-    }
-    
-    // Show immediate typing feedback
-    if (canSearch) {
-      isTyping = true;
-    }
-    
-    // Reduced debounce time for better responsiveness
-    searchTimeout = setTimeout(() => {
-      performSearch();
-    }, 150); // Reduced from 300ms to 150ms
+    // Defer all other work to next frame for immediate input response
+    requestAnimationFrame(() => {
+      const trimmedInput = searchInput.trim();
+      
+      if (!trimmedInput) {
+        searchResults = [];
+        queryEmbedding = null;
+        isTyping = false;
+        return;
+      }
+      
+      // Show immediate typing feedback
+      if (canSearch) {
+        isTyping = true;
+      }
+      
+      // Schedule search with debounce
+      searchTimeout = setTimeout(() => {
+        performSearch();
+      }, 150);
+    });
   }
 
   onMount(async () => {
