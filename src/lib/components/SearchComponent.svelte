@@ -230,6 +230,7 @@
       {placeholder}
       aria-label="Semantic search query"
       disabled={!canType}
+      class="search-input"
     />
     {#if searchInput.trim()}
       <button class="clear-btn" on:click={clearSearch} aria-label="Clear search">
@@ -238,269 +239,282 @@
     {/if}
   </div>
   {#if isModelLoading || isIndexing || isSearching || isTyping}
-    <div class="spinner" class:typing={isTyping}></div>
+    <div class="status-indicator" class:typing={isTyping}></div>
   {/if}
 </div>
 
 {#if queryEmbedding}
-  <div id="query-container">
-    <h2>Your Query</h2>
+  <div class="query-section">
+    <h3>Query</h3>
     <div class="query-item">
-      <div class="query-text">"{searchInput}"</div>
-      <div class="corpus-vector-preview">
-        [{queryEmbedding.data.slice(0, 4).map(/** @param {number} v */ v => v.toFixed(4)).join(', ')}, ...]
-        <button 
-          class="toggle-vector-btn"
-          on:click={() => showQueryVector = !showQueryVector}
-        >
-          {showQueryVector ? 'Hide Vector' : 'Show Vector'}
-        </button>
-      </div>
-      {#if showQueryVector}
-        <div class="corpus-vector-full">
-          [{Array.from(queryEmbedding.data).map(/** @param {number} v */ v => v.toFixed(4)).join(', ')}]
-        </div>
-      {/if}
+      <p class="query-text">"{searchInput}"</p>
+      <details class="vector-details">
+        <summary>Vector ({queryEmbedding.data.length} dimensions)</summary>
+        <pre class="vector-data">[{Array.from(queryEmbedding.data).map(v => v.toFixed(3)).join(', ')}]</pre>
+      </details>
     </div>
   </div>
 {/if}
 
 {#if corpusEmbeddings}
-  <div id="corpus-container">
-    <h2>Corpus</h2>
-    {#each CORPUS as text, i}
-      {@const vector = corpusEmbeddings.data.slice(i * 384, (i + 1) * 384)}
-      {@const isHighlight = searchResults.length > 0 && searchResults[0].index === i}
-      {@const similarityScore = searchResults.find(r => r.index === i)?.score}
-      
-      <div 
-        class="corpus-item"
-        class:highlight={isHighlight}
-      >
-        <div class="corpus-text">{text}</div>
-        <div class="corpus-vector-preview">
-          [{vector.slice(0, 4).map(/** @param {number} v */ v => v.toFixed(4)).join(', ')}, ...]
-          <button 
-            class="toggle-vector-btn"
-            on:click={() => toggleVector(`corpus-${i}`)}
-          >
-            {vectorVisibility[`corpus-${i}`] ? 'Hide Vector' : 'Show Vector'}
-          </button>
+  <div class="corpus-section">
+    <h3>Corpus</h3>
+    <div class="corpus-list">
+      {#each CORPUS as text, i}
+        {@const vector = corpusEmbeddings.data.slice(i * 384, (i + 1) * 384)}
+        {@const isTopResult = searchResults.length > 0 && searchResults[0].index === i}
+        {@const similarityScore = searchResults.find(r => r.index === i)?.score}
+        
+        <div class="corpus-item" class:top-result={isTopResult}>
+          <p class="corpus-text">{text}</p>
+          
+          {#if similarityScore !== undefined}
+            <div class="similarity-info">
+              <span class="similarity-score">similarity: {similarityScore.toFixed(3)}</span>
+            </div>
+          {/if}
+          
+          <details class="vector-details">
+            <summary>Vector</summary>
+            <pre class="vector-data">[{Array.from(vector).map(v => v.toFixed(3)).join(', ')}]</pre>
+          </details>
         </div>
-        {#if vectorVisibility[`corpus-${i}`]}
-          <div class="corpus-vector-full">
-            [{Array.from(vector).map(/** @param {number} v */ v => v.toFixed(4)).join(', ')}]
-          </div>
-        {/if}
-        {#if similarityScore !== undefined}
-          <div class="similarity-score">
-            Similarity: {similarityScore.toFixed(4)}
-          </div>
-        {/if}
-      </div>
-    {/each}
+      {/each}
+    </div>
   </div>
 {/if}
 
 <style>
   .search-container {
-    margin: 2rem 0;
+    margin: 3rem 0;
     display: flex;
-    gap: 0.75rem;
+    gap: 1rem;
     align-items: center;
   }
 
   .search-input-wrapper {
-    flex-grow: 1;
+    flex: 1;
     position: relative;
-    display: flex;
-    align-items: center;
   }
 
-  input {
+  .search-input {
     width: 100%;
-    padding: 0.75rem;
+    padding: 0.6rem 0.8rem;
     padding-right: 2.5rem;
-    border: 2px solid #ccc;
-    border-radius: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
     font-size: 1rem;
+    font-family: inherit;
+    background: #fff;
     transition: border-color 0.2s ease;
   }
 
-  input:focus {
+  .search-input:focus {
     outline: none;
-    border-color: #007bff;
+    border-color: #0066cc;
+  }
+
+  .search-input:disabled {
+    background: #f8f8f8;
+    color: #999;
+    cursor: not-allowed;
   }
 
   .clear-btn {
     position: absolute;
     right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
     background: none;
     border: none;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     color: #999;
     cursor: pointer;
     padding: 0.25rem;
-    border-radius: 4px;
-    width: 2rem;
-    height: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.2s ease, background-color 0.2s ease;
+    border-radius: 2px;
+    line-height: 1;
   }
 
   .clear-btn:hover {
     color: #666;
-    background-color: #f0f0f0;
+    background: #f0f0f0;
   }
 
-  .spinner {
-    border: 3px solid rgba(0, 0, 0, 0.1);
-    width: 20px;
-    height: 20px;
+  .status-indicator {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f0f0f0;
+    border-top-color: #0066cc;
     border-radius: 50%;
-    border-left-color: #007bff;
     animation: spin 1s linear infinite;
-    flex-shrink: 0;
   }
 
-  .spinner.typing {
-    border-left-color: #28a745;
-    animation: spin 0.6s linear infinite;
+  .status-indicator.typing {
+    border-top-color: #28a745;
+    animation-duration: 0.8s;
   }
 
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
 
-  #corpus-container, #query-container {
-    margin-top: 1rem;
+  .query-section, .corpus-section {
+    margin-top: 2.5rem;
   }
 
-  .corpus-item, .query-item {
-    padding: 0.75rem;
-    border: 2px solid #dee2e6;
-    border-radius: 6px;
-    margin-bottom: 0.75rem;
-    background: #f8f9fa;
-    /* Optimized transitions - only animate specific properties */
-    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
-    /* Hint to browser about what will change */
-    will-change: border-color, background-color, box-shadow;
+  .query-section h3, .corpus-section h3 {
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #555;
   }
 
-  .corpus-item.highlight {
-    border-color: #007bff;
-    background-color: #e7f1ff;
-    /* Use box-shadow instead of transform for better scroll performance */
-    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+  .corpus-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .corpus-item {
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #f5f5f5;
+    transition: all 0.2s ease;
+  }
+
+  .corpus-item:last-child {
+    border-bottom: none;
+  }
+
+  .corpus-item.top-result {
+    padding-left: 0.5rem;
+    border-left: 3px solid #0066cc;
+    border-bottom-color: #e6f2ff;
+    background: #fafcff;
+  }
+
+  .query-item {
+    padding: 1rem 0;
+    border-bottom: 1px solid #f0f0f0;
   }
 
   .corpus-text, .query-text {
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
+    margin: 0 0 0.8rem 0;
+    line-height: 1.5;
   }
 
   .query-text {
     font-style: italic;
+    color: #666;
   }
 
-  .corpus-vector-preview {
-    font-family: monospace;
-    font-size: 0.8rem;
-    color: #6c757d;
-    word-break: break-all;
-    /* Optimize text rendering for better scroll performance */
-    contain: layout;
-  }
-
-  .corpus-vector-full {
-    font-family: monospace;
-    font-size: 0.8rem;
-    color: #495057;
-    word-break: break-all;
-    background: #e9ecef;
-    padding: 0.5rem;
-    border-radius: 4px;
-    margin-top: 0.5rem;
-    /* Optimize text rendering for better scroll performance */
-    contain: layout;
+  .similarity-info {
+    margin-bottom: 0.8rem;
   }
 
   .similarity-score {
-    font-weight: bold;
-    font-family: monospace;
-    font-size: 0.9rem;
-    color: #0056b3;
+    font-size: 0.85rem;
+    color: #0066cc;
+    font-weight: 500;
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+  }
+
+  .vector-details {
     margin-top: 0.5rem;
   }
 
-  .toggle-vector-btn {
-    background: none;
-    border: none;
-    color: #007bff;
-    text-decoration: underline;
+  .vector-details summary {
+    font-size: 0.85rem;
+    color: #888;
     cursor: pointer;
-    font-size: 0.8rem;
-    padding: 0.25rem 0;
-    height: auto;
+    padding: 0.2rem 0;
+    user-select: none;
+  }
+
+  .vector-details summary:hover {
+    color: #555;
+  }
+
+  .vector-data {
+    font-size: 0.75rem;
+    color: #666;
+    background: #f8f8f8;
+    padding: 1rem;
+    margin: 0.5rem 0 0 0;
+    border-radius: 4px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.4;
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
   }
 
   @media (prefers-color-scheme: dark) {
-    input {
-      background: #0d1117;
-      border-color: #30363d;
-      color: #c9d1d9;
+    .search-input {
+      background: #1a1a1a;
+      border-color: #404040;
+      color: #e6e6e6;
     }
 
-    input:focus {
-      border-color: #58a6ff;
+    .search-input:focus {
+      border-color: #66b3ff;
+    }
+
+    .search-input:disabled {
+      background: #2a2a2a;
+      color: #888;
     }
 
     .clear-btn {
-      color: #8b949e;
+      color: #888;
     }
 
     .clear-btn:hover {
-      color: #c9d1d9;
-      background-color: #30363d;
+      color: #aaa;
+      background: #2a2a2a;
     }
 
-    .spinner {
-      border-left-color: #58a6ff;
+    .status-indicator {
+      border-color: #333;
+      border-top-color: #66b3ff;
     }
 
-    .spinner.typing {
-      border-left-color: #7c3aed;
+    .query-section h3, .corpus-section h3 {
+      color: #ccc;
     }
 
-    .corpus-item, .query-item {
-      background: #161b22;
-      border-color: #30363d;
+    .corpus-item {
+      border-bottom-color: #2a2a2a;
     }
 
-    .corpus-item.highlight {
-      border-color: #58a6ff;
-      background-color: #1f2c40;
-      box-shadow: 0 2px 8px rgba(88, 166, 255, 0.15);
+    .corpus-item.top-result {
+      border-left-color: #66b3ff;
+      border-bottom-color: #1a2332;
+      background: #151a20;
     }
 
-    .corpus-vector-preview {
-      color: #8b949e;
+    .query-item {
+      border-bottom-color: #333;
     }
 
-    .corpus-vector-full {
-      background: #0d1117;
-      color: #c9d1d9;
+    .query-text {
+      color: #aaa;
     }
 
     .similarity-score {
-      color: #79c0ff;
+      color: #66b3ff;
     }
 
-    .toggle-vector-btn {
-      color: #58a6ff;
+    .vector-details summary {
+      color: #888;
+    }
+
+    .vector-details summary:hover {
+      color: #aaa;
+    }
+
+    .vector-data {
+      background: #1a1a1a;
+      color: #ccc;
     }
   }
 </style>
