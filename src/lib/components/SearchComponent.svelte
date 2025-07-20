@@ -1,7 +1,21 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { requestEmbedding, initializeTransformers } from '$lib/workers/transformers-init.js';
+
+  // Types (using JSDoc since this is JS, not TS)
+  
+  /** @typedef {Object} Embedding
+   * @property {Float32Array} data
+   * @property {number[]} dims
+   * @property {string} type
+   */
+  
+  /** @typedef {Object} SearchResult
+   * @property {string} text
+   * @property {number} score
+   * @property {number} index
+   */
 
   // State and Data
   const CORPUS = [
@@ -17,25 +31,35 @@
     "Economic policy can have a major impact on inflation."
   ];
 
-  // Reactive state
+  // Reactive state with proper initial types
   let searchInput = '';
   let isModelLoading = true;
   let isIndexing = false;
   let isSearching = false;
   let hasError = false;
+  /** @type {Embedding | null} */
   let corpusEmbeddings = null;
+  /** @type {SearchResult[]} */
   let searchResults = [];
+  /** @type {Embedding | null} */
   let queryEmbedding = null;
   let showQueryVector = false;
+  /** @type {Record<string, boolean>} */
   let vectorVisibility = {};
 
   // Computed properties
-  $: canSearch = !isModelLoading && !isIndexing && !isSearching && corpusEmbeddings;
+  $: canSearch = !isModelLoading && !isIndexing && corpusEmbeddings;
+  $: canType = !isModelLoading && !isIndexing; // Separate condition for typing
   $: placeholder = isModelLoading ? 'Loading model...' : 
                    isIndexing ? 'Creating search index...' : 
                    hasError ? 'An error occurred.' : 
                    'Enter search query...';
 
+  /**
+   * @param {number[] | Float32Array} vecA
+   * @param {number[] | Float32Array} vecB
+   * @returns {number}
+   */
   function cosineSimilarity(vecA, vecB) {
     let dotProduct = 0;
     let normA = 0;
@@ -48,7 +72,7 @@
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
   }
 
-  async function handleSearch() {
+  async function performSearch() {
     if (!canSearch || !searchInput.trim()) {
       searchResults = [];
       queryEmbedding = null;
@@ -62,6 +86,7 @@
       queryEmbedding = await requestEmbedding(searchInput.trim());
       
       // Perform the search
+      /** @type {SearchResult[]} */
       const results = [];
       for (let i = 0; i < CORPUS.length; i++) {
         const docEmbeddingData = corpusEmbeddings.data.slice(i * 384, (i + 1) * 384);
@@ -93,6 +118,9 @@
     }
   }
 
+  /**
+   * @param {any} error
+   */
   function onModelError(error) {
     console.error('Model loading failed:', error);
     hasError = true;
@@ -100,15 +128,34 @@
     isIndexing = false;
   }
 
+  /**
+   * @param {string} id
+   */
   function toggleVector(id) {
-    vectorVisibility[id] = !vectorVisibility[id];
+    vectorVisibility = { ...vectorVisibility, [id]: !vectorVisibility[id] };
+  }
+
+  // Debounced search function
+  let searchTimeout;
+  function handleInput() {
+    if (searchTimeout) clearTimeout(searchTimeout);
+    
+    if (!searchInput.trim()) {
+      searchResults = [];
+      queryEmbedding = null;
+      return;
+    }
+    
+    searchTimeout = setTimeout(() => {
+      performSearch();
+    }, 300); // 300ms debounce
   }
 
   onMount(async () => {
     if (!browser) return;
 
     try {
-      const { modelReady, modelError } = await initializeTransformers();
+      const { modelReady } = await initializeTransformers();
       
       if (modelReady) {
         isModelLoading = false;
@@ -120,6 +167,9 @@
           onModelReady();
         };
         
+        /**
+         * @param {CustomEvent} event
+         */
         const handleModelError = (event) => {
           onModelError(event.detail);
         };
@@ -138,25 +188,33 @@
     }
   });
 
+  /**
+   * @param {KeyboardEvent} event
+   */
   function handleKeydown(event) {
     if (event.key === 'Enter') {
-      handleSearch();
+      event.preventDefault();
+      performSearch();
     }
+  }
+
+  function handleButtonClick() {
+    performSearch();
   }
 </script>
 
 <div class="search-container">
   <input
     bind:value={searchInput}
-    on:input={handleSearch}
+    on:input={handleInput}
     on:keydown={handleKeydown}
     {placeholder}
     aria-label="Semantic search query"
-    disabled={!canSearch}
+    disabled={!canType}
   />
   <button
-    on:click={handleSearch}
-    disabled={!canSearch}
+    on:click={handleButtonClick}
+    disabled={!canSearch || isSearching}
     class:searching={isSearching}
   >
     {isSearching ? 'Searching...' : 'Search'}
@@ -172,7 +230,7 @@
     <div class="query-item">
       <div class="query-text">"{searchInput}"</div>
       <div class="corpus-vector-preview">
-        [{queryEmbedding.data.slice(0, 4).map(v => v.toFixed(4)).join(', ')}, ...]
+        [{queryEmbedding.data.slice(0, 4).map(/** @param {number} v */ v => v.toFixed(4)).join(', ')}, ...]
         <button 
           class="toggle-vector-btn"
           on:click={() => showQueryVector = !showQueryVector}
@@ -182,7 +240,7 @@
       </div>
       {#if showQueryVector}
         <div class="corpus-vector-full">
-          [{Array.from(queryEmbedding.data).map(v => v.toFixed(4)).join(', ')}]
+          [{Array.from(queryEmbedding.data).map(/** @param {number} v */ v => v.toFixed(4)).join(', ')}]
         </div>
       {/if}
     </div>
@@ -203,7 +261,7 @@
       >
         <div class="corpus-text">{text}</div>
         <div class="corpus-vector-preview">
-          [{vector.slice(0, 4).map(v => v.toFixed(4)).join(', ')}, ...]
+          [{vector.slice(0, 4).map(/** @param {number} v */ v => v.toFixed(4)).join(', ')}, ...]
           <button 
             class="toggle-vector-btn"
             on:click={() => toggleVector(`corpus-${i}`)}
@@ -213,7 +271,7 @@
         </div>
         {#if vectorVisibility[`corpus-${i}`]}
           <div class="corpus-vector-full">
-            [{Array.from(vector).map(v => v.toFixed(4)).join(', ')}]
+            [{Array.from(vector).map(/** @param {number} v */ v => v.toFixed(4)).join(', ')}]
           </div>
         {/if}
         {#if similarityScore !== undefined}
