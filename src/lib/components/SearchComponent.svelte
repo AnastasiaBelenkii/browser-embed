@@ -378,13 +378,17 @@
     border-radius: 6px;
     margin-bottom: 0.75rem;
     background: #f8f9fa;
-    transition: all 0.2s ease-in-out;
+    /* Optimized transitions - only animate specific properties */
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+    /* Hint to browser about what will change */
+    will-change: border-color, background-color, box-shadow;
   }
 
   .corpus-item.highlight {
     border-color: #007bff;
     background-color: #e7f1ff;
-    transform: scale(1.02);
+    /* Use box-shadow instead of transform for better scroll performance */
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
   }
 
   .corpus-text, .query-text {
@@ -401,6 +405,8 @@
     font-size: 0.8rem;
     color: #6c757d;
     word-break: break-all;
+    /* Optimize text rendering for better scroll performance */
+    contain: layout;
   }
 
   .corpus-vector-full {
@@ -412,6 +418,8 @@
     padding: 0.5rem;
     border-radius: 4px;
     margin-top: 0.5rem;
+    /* Optimize text rendering for better scroll performance */
+    contain: layout;
   }
 
   .similarity-score {
@@ -469,6 +477,7 @@
     .corpus-item.highlight {
       border-color: #58a6ff;
       background-color: #1f2c40;
+      box-shadow: 0 2px 8px rgba(88, 166, 255, 0.15);
     }
 
     .corpus-vector-preview {
