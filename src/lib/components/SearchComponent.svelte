@@ -37,7 +37,7 @@
   let isIndexing = false;
   let isSearching = false;
   let hasError = false;
-  let isTyping = false; // New state to show immediate feedback
+  let isTyping = false;
   /** @type {Embedding | null} */
   let corpusEmbeddings = null;
   /** @type {SearchResult[]} */
@@ -50,7 +50,7 @@
 
   // Computed properties
   $: canSearch = !isModelLoading && !isIndexing && corpusEmbeddings;
-  $: canType = !isModelLoading && !isIndexing; // Separate condition for typing
+  $: canType = !isModelLoading && !isIndexing;
   $: placeholder = isModelLoading ? 'Loading model...' : 
                    isIndexing ? 'Creating search index...' : 
                    hasError ? 'An error occurred.' : 
@@ -82,7 +82,7 @@
 
     try {
       isSearching = true;
-      isTyping = false; // Clear typing state when actual search starts
+      isTyping = false;
       
       // Generate embedding for the user's query
       queryEmbedding = await requestEmbedding(searchInput.trim());
@@ -174,9 +174,8 @@
     });
   }
 
-  onMount(async () => {
-    if (!browser) return;
-
+  // Initialize transformers with better performance characteristics
+  async function initializeTransformersOptimized() {
     try {
       const { modelReady } = await initializeTransformers();
       
@@ -209,6 +208,29 @@
       console.error('Failed to initialize transformers:', error);
       onModelError(error);
     }
+  }
+
+  onMount(async () => {
+    if (!browser) return;
+
+    // Defer heavy initialization to avoid blocking initial render
+    // Use requestIdleCallback if available, otherwise setTimeout
+    const scheduleInit = () => {
+      if (window.requestIdleCallback) {
+        window.requestIdleCallback(() => {
+          initializeTransformersOptimized();
+        }, { timeout: 100 });
+      } else {
+        setTimeout(() => {
+          initializeTransformersOptimized();
+        }, 10);
+      }
+    };
+
+    // Schedule after initial render is complete
+    requestAnimationFrame(() => {
+      scheduleInit();
+    });
   });
 
   /**
@@ -290,6 +312,8 @@
     display: flex;
     gap: 1rem;
     align-items: center;
+    /* Optimize for initial render performance */
+    contain: layout;
   }
 
   .search-input-wrapper {
@@ -307,6 +331,8 @@
     font-family: inherit;
     background: #fff;
     transition: border-color 0.2s ease;
+    /* Optimize input performance */
+    will-change: border-color;
   }
 
   .search-input:focus {
@@ -333,6 +359,8 @@
     padding: 0.25rem;
     border-radius: 2px;
     line-height: 1;
+    /* Optimize button performance */
+    will-change: color, background-color;
   }
 
   .clear-btn:hover {
@@ -347,6 +375,8 @@
     border-top-color: #0066cc;
     border-radius: 50%;
     animation: spin 1s linear infinite;
+    /* Optimize spinner performance */
+    will-change: transform;
   }
 
   .status-indicator.typing {
@@ -360,6 +390,8 @@
 
   .query-section, .corpus-section {
     margin-top: 2.5rem;
+    /* Optimize section rendering */
+    contain: layout;
   }
 
   .query-section h3, .corpus-section h3 {
@@ -373,12 +405,16 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    /* Optimize list rendering */
+    contain: layout;
   }
 
   .corpus-item {
     padding-bottom: 1rem;
     border-bottom: 1px solid #f5f5f5;
     transition: all 0.2s ease;
+    /* Optimize item performance */
+    contain: layout;
   }
 
   .corpus-item:last-child {
@@ -446,6 +482,8 @@
     word-break: break-all;
     line-height: 1.4;
     font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+    /* Optimize code block performance */
+    contain: layout;
   }
 
   @media (prefers-color-scheme: dark) {
