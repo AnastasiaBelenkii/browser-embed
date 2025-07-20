@@ -53,7 +53,7 @@
   $: placeholder = isModelLoading ? 'Loading model...' : 
                    isIndexing ? 'Creating search index...' : 
                    hasError ? 'An error occurred.' : 
-                   'Enter search query...';
+                   'Search semantic space...';
 
   /**
    * @param {number[] | Float32Array} vecA
@@ -135,6 +135,12 @@
     vectorVisibility = { ...vectorVisibility, [id]: !vectorVisibility[id] };
   }
 
+  function clearSearch() {
+    searchInput = '';
+    searchResults = [];
+    queryEmbedding = null;
+  }
+
   // Debounced search function
   let searchTimeout;
   function handleInput() {
@@ -192,33 +198,28 @@
    * @param {KeyboardEvent} event
    */
   function handleKeydown(event) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      performSearch();
+    if (event.key === 'Escape') {
+      clearSearch();
     }
-  }
-
-  function handleButtonClick() {
-    performSearch();
   }
 </script>
 
 <div class="search-container">
-  <input
-    bind:value={searchInput}
-    on:input={handleInput}
-    on:keydown={handleKeydown}
-    {placeholder}
-    aria-label="Semantic search query"
-    disabled={!canType}
-  />
-  <button
-    on:click={handleButtonClick}
-    disabled={!canSearch || isSearching}
-    class:searching={isSearching}
-  >
-    {isSearching ? 'Searching...' : 'Search'}
-  </button>
+  <div class="search-input-wrapper">
+    <input
+      bind:value={searchInput}
+      on:input={handleInput}
+      on:keydown={handleKeydown}
+      {placeholder}
+      aria-label="Semantic search query"
+      disabled={!canType}
+    />
+    {#if searchInput.trim()}
+      <button class="clear-btn" on:click={clearSearch} aria-label="Clear search">
+        ×
+      </button>
+    {/if}
+  </div>
   {#if isModelLoading || isIndexing || isSearching}
     <div class="spinner"></div>
   {/if}
@@ -288,45 +289,63 @@
   .search-container {
     margin: 2rem 0;
     display: flex;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .search-input-wrapper {
+    flex-grow: 1;
+    position: relative;
+    display: flex;
     align-items: center;
   }
 
   input {
-    flex-grow: 1;
-    padding: 0.5rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    width: 100%;
+    padding: 0.75rem;
+    padding-right: 2.5rem;
+    border: 2px solid #ccc;
+    border-radius: 8px;
     font-size: 1rem;
+    transition: border-color 0.2s ease;
   }
 
-  button {
-    padding: 0.5rem 1rem;
-    background: #007bff;
-    color: white;
+  input:focus {
+    outline: none;
+    border-color: #007bff;
+  }
+
+  .clear-btn {
+    position: absolute;
+    right: 0.5rem;
+    background: none;
     border: none;
-    border-radius: 4px;
+    font-size: 1.5rem;
+    color: #999;
     cursor: pointer;
-    font-size: 1rem;
-    height: 42px;
+    padding: 0.25rem;
+    border-radius: 4px;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease, background-color 0.2s ease;
   }
 
-  button:hover:not(:disabled) {
-    background: #0069d9;
-  }
-
-  button:disabled {
-    cursor: not-allowed;
-    opacity: 0.7;
+  .clear-btn:hover {
+    color: #666;
+    background-color: #f0f0f0;
   }
 
   .spinner {
-    border: 4px solid rgba(0, 0, 0, 0.1);
-    width: 24px;
-    height: 24px;
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
-    border-left-color: #444;
+    border-left-color: #007bff;
     animation: spin 1s linear infinite;
+    flex-shrink: 0;
   }
 
   @keyframes spin {
@@ -403,6 +422,19 @@
       background: #0d1117;
       border-color: #30363d;
       color: #c9d1d9;
+    }
+
+    input:focus {
+      border-color: #58a6ff;
+    }
+
+    .clear-btn {
+      color: #8b949e;
+    }
+
+    .clear-btn:hover {
+      color: #c9d1d9;
+      background-color: #30363d;
     }
 
     .spinner {

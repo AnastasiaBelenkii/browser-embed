@@ -5,7 +5,7 @@
 </script>
 
 <svelte:head>
-  <title>Interactive ML Blog</title>
+  <title>Explorations</title>
 </svelte:head>
 
 <header id="title-block-header">

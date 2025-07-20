@@ -1,5 +1,5 @@
 ---
-title: Interactive Semantic Search
+title: Semantic Search
 description: Understanding embeddings through visualization
 ---
 
@@ -9,7 +9,7 @@ description: Understanding embeddings through visualization
 
 ## What are Embeddings?
 
-While the model loads in the background, let's understand what we're building. Embeddings are dense vector representations of text that capture semantic meaning. Similar concepts end up close together in this high-dimensional space.
+Embeddings are dense vector representations of text that capture semantic meaning. Similar concepts end up close together in this high-dimensional space.
 
 <SearchComponent />
 
