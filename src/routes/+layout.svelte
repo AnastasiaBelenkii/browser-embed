@@ -2,6 +2,23 @@
   import '../app.css';
   import { page } from '$app/stores';
   import { base } from '$app/paths';
+
+  // Build breadcrumbs based on current page
+  $: breadcrumbs = (() => {
+    const crumbs = [{ label: 'Explorations', href: `${base}/` }];
+    
+    if ($page.params.slug) {
+      // We're on a post page
+      const postTitles = {
+        'semantic-search': 'Semantic Search'
+      };
+      
+      const postTitle = postTitles[$page.params.slug] || $page.params.slug;
+      crumbs.push({ label: postTitle, href: null }); // null means current page
+    }
+    
+    return crumbs;
+  })();
 </script>
 
 <svelte:head>
@@ -9,11 +26,18 @@
 </svelte:head>
 
 <header id="title-block-header">
-  <nav id="blog-nav">
-    <a href="{base}/">Home</a>
-    <a href="{base}/semantic-search">Semantic Search</a>
+  <nav class="breadcrumbs">
+    {#each breadcrumbs as crumb, i}
+      {#if i > 0}
+        <span class="separator">→</span>
+      {/if}
+      {#if crumb.href}
+        <a href={crumb.href}>{crumb.label}</a>
+      {:else}
+        <span class="current">{crumb.label}</span>
+      {/if}
+    {/each}
   </nav>
-  <h1 class="title">Explorations</h1>
 </header>
 
 <article class="content">
