@@ -30,6 +30,8 @@ jobs:
       
       - name: Build
         run: npm run build
+        env:
+          BASE_PATH: /browser-embed
       
       - name: Copy .nojekyll back to docs
         run: echo "# File to disable Jekyll processing on GitHub Pages" > docs/.nojekyll
