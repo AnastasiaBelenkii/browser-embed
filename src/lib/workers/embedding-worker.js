@@ -62,7 +62,6 @@ self.onmessage = async (event) => {
     }
 };
 
-
 // --- Initial Model Loading ---
 // Immediately attempt to load the model and notify the main thread when ready.
 (async () => {

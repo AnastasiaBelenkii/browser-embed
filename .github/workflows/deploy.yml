@@ -1,0 +1,52 @@
+name: Build and Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Set up Git config
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+      
+      - name: Deploy to gh-pages branch
+        run: |
+          git fetch origin gh-pages:gh-pages || git checkout --orphan gh-pages
+          git checkout gh-pages
+          
+          # Remove all files except .git and docs
+          find . -maxdepth 1 ! -name '.git' ! -name 'docs' ! -name '.' -exec rm -rf {} +
+          
+          # Move built files to root
+          if [ -d "docs" ]; then
+            mv docs/* .
+            rmdir docs
+          fi
+          
+          # Add all files and commit
+          git add .
+          git commit -m "Deploy from main branch - $(date)" || echo "No changes to commit"
+          git push origin gh-pages
