@@ -31,8 +31,8 @@ jobs:
       - name: Build
         run: npm run build
       
-      - name: Copy .nojekyll to docs
-        run: cp docs/.nojekyll build/ || cp docs/.nojekyll dist/ || echo "Could not find build output directory"
+      - name: Copy .nojekyll back to docs
+        run: echo "# File to disable Jekyll processing on GitHub Pages" > docs/.nojekyll
       
       - name: Set up Git config
         run: |
