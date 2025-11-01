@@ -49,7 +49,7 @@ jobs:
           
           # Move built files to root
           if [ -d "docs" ]; then
-            mv docs/. .
+            shopt -s dotglob && mv docs/* .
             rmdir docs
           fi
           
