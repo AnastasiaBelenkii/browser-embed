@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="./favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Interactive ML blog with client-side demonstrations" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>Interactive ML Blog</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+        }
+      }
+    </script>
+    
+		<link href="./_app/immutable/assets/0.CHveUw5Y.css" rel="stylesheet">
+		<link href="./_app/immutable/assets/semantic-search.qCFYRyIw.css" rel="stylesheet">
+		<link rel="modulepreload" href="./_app/immutable/entry/start.B2DCCKQN.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/CumWI8tn.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/D1YERkKp.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/CB3Af3xl.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/CAgE10R1.js">
+		<link rel="modulepreload" href="./_app/immutable/entry/app.DwaEm3AI.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/C1FmrZbK.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/IHki7fMi.js">
+		<link rel="modulepreload" href="./_app/immutable/nodes/0.CSPgoWBL.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/D6YF6ztN.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/BQtubmv3.js">
+		<link rel="modulepreload" href="./_app/immutable/nodes/3.BFwFVHNx.js"><title>Semantic Search - Interactive ML Blog</title><!-- HEAD_svelte-o9940z_START --><!-- HEAD_svelte-o9940z_END --><!-- HEAD_svelte-1smhibi_START --><meta name="description" content="Understanding embeddings through visualization"><!-- HEAD_svelte-1smhibi_END -->
+  </head>
+  <body>
+    <div style="display: contents">   <header id="title-block-header"><nav class="breadcrumbs"> <a href="./">Explorations</a><span class="separator" data-svelte-h="svelte-89ialg">→</span> <span class="current">Semantic Search</span></nav></header> <article class="content"> <header class="post-header"><h1 class="post-title">Semantic Search</h1> <p class="post-description">Understanding embeddings through visualization</p></header> <div class="post-content svelte-x9k56u"><h2 data-svelte-h="svelte-r42999">What are Embeddings?</h2> <p data-svelte-h="svelte-39xp2f">Embeddings are dense vector representations of text that capture semantic meaning. Similar concepts end up close together in this high-dimensional space.</p> <div class="search-container svelte-opypxp"><div class="search-input-wrapper svelte-opypxp"><input placeholder="Loading model..." aria-label="Semantic search query" disabled class="search-input svelte-opypxp" value=""> </div> <div class="status-indicator svelte-opypxp"></div></div>   <h2 data-svelte-h="svelte-14knkj">How It Works</h2> <p data-svelte-h="svelte-1a0tc6a">This demonstration runs entirely client-side, with no server processing. The transformer model processes your text and converts it to a 384-dimensional vector. We then use cosine similarity to find the most related documents.</p> <h2 data-svelte-h="svelte-ob03xp">Technical Implementation</h2> <ul data-svelte-h="svelte-ork8uy"><li><strong>Model</strong>: all-MiniLM-L6-v2 via transformers.js</li> <li><strong>Visualization</strong>: Three.js with PCA dimensionality reduction</li> <li><strong>Architecture</strong>: Web Workers for non-blocking computation</li></ul> <p data-svelte-h="svelte-1ltzsus">Stay tuned as I add more functionality!</p> </div></article> <footer data-svelte-h="svelte-cihlii"><p><a href="https://github.com/AnastasiaBelenkii/browser-embed" target="_blank" rel="noopener noreferrer">Code</a></p> <p>Email me at anastasia@belenky.net with thoughts, feelings, unsolicited advice, and technical suggestions. Anything at all. Please.</p></footer> 
+			
+			<script>
+				{
+					__sveltekit_eo2et3 = {
+						base: new URL(".", location).pathname.slice(0, -1),
+						assets: "/browser-embed"
+					};
+
+					const element = document.currentScript.parentElement;
+
+					Promise.all([
+						import("./_app/immutable/entry/start.B2DCCKQN.js"),
+						import("./_app/immutable/entry/app.DwaEm3AI.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element, {
+							node_ids: [0, 3],
+							data: [null,null],
+							form: null,
+							error: null
+						});
+					});
+				}
+			</script>
+		</div>
+  </body>
+</html>
