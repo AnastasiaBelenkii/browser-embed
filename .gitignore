@@ -9,8 +9,6 @@ node_modules
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Keep the docs folder in git for GitHub Pages
-# but ignore its contents since it's build output
-docs/*
-!docs/.nojekyll
+# Build output directory for GitHub Pages
+/docs
 .aider*
