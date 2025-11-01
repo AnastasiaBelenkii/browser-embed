@@ -25,6 +25,10 @@ const config = {
     }),
     paths: {
       base: process.env.NODE_ENV === 'production' ? '/browser-embed' : ''
+    },
+    prerender: {
+      handleMissingId: 'warn',
+      handleHttpError: 'warn'
     }
   }
 };
