@@ -1,56 +1,61 @@
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
-<head>
-  <meta charset="utf-8" />
-  <meta name="generator" content="pandoc" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <meta name="description" content="Client-side semantic search using embeddings" />
-  <meta name="theme-color" content="#ffffff" />
-  <title>In Browser Semantic Search</title>
-  <link rel="stylesheet" href="style.css" />
-  <script type="module" src="js/transformers-init.js"></script>
-</head>
-<body>
-<header id="title-block-header">
-<h1 class="title">In Browser Semantic Search</h1>
-</header>
-
-<article class="content">
-  <section>
-    <p>My attempt to wrap my head around embeddings and semantic search.</p>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="./favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Interactive ML blog with client-side demonstrations" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>Interactive ML Blog</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+        }
+      }
+    </script>
     
-    <!-- Search component HTML is now directly here -->
-    <div class="search-container">
-      <input
-        type="text"
-        id="search-input"
-        placeholder="Loading model..."
-        aria-label="Semantic search query"
-        disabled
-      />
-      <button id="search-button" disabled>Search</button>
-      <div id="spinner" class="spinner"></div>
-    </div>
+		<link href="./_app/immutable/assets/0.CHveUw5Y.css" rel="stylesheet">
+		<link href="./_app/immutable/assets/2.D3AC0rGx.css" rel="stylesheet">
+		<link rel="modulepreload" href="./_app/immutable/entry/start.G6Yt6ptf.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/CvhuibOH.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/D1YERkKp.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/BmZeCfid.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/Bzy9_L8Y.js">
+		<link rel="modulepreload" href="./_app/immutable/entry/app.C2PLcNFH.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/C1FmrZbK.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/IHki7fMi.js">
+		<link rel="modulepreload" href="./_app/immutable/nodes/0.CcZpJN0I.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/D6YF6ztN.js">
+		<link rel="modulepreload" href="./_app/immutable/chunks/BBfTumho.js">
+		<link rel="modulepreload" href="./_app/immutable/nodes/2.BL8FRWDR.js"><title>Explorations</title><!-- HEAD_svelte-o9940z_START --><!-- HEAD_svelte-o9940z_END --><!-- HEAD_svelte-o9940z_START --><!-- HEAD_svelte-o9940z_END -->
+  </head>
+  <body>
+    <div style="display: contents">   <header id="title-block-header"><nav class="breadcrumbs"> <a href="./">Explorations</a></nav></header> <article class="content"> <header class="post-header" data-svelte-h="svelte-1nrhejs"><h1 class="post-title">Explorations</h1> <p class="post-description">Exploring machine learning concepts through interactive demonstrations</p></header> <section><h2 data-svelte-h="svelte-m5dio3">Posts</h2> <div class="post-preview svelte-1je28ew"><h3 class="svelte-1je28ew"><a href="./semantic-search" class="svelte-1je28ew">Semantic Search</a></h3> <p class="svelte-1je28ew">Understanding embeddings through visualization</p> </div> </section></article> <footer data-svelte-h="svelte-cihlii"><p><a href="https://github.com/AnastasiaBelenkii/browser-embed" target="_blank" rel="noopener noreferrer">Code</a></p> <p>Email me at anastasia@belenky.net with thoughts, feelings, unsolicited advice, and technical suggestions. Anything at all. Please.</p></footer> 
+			
+			<script>
+				{
+					__sveltekit_tivv2x = {
+						base: new URL(".", location).pathname.slice(0, -1),
+						assets: "/browser-embed"
+					};
 
-    <div id="query-container"></div>
-    <div id="corpus-container"></div>
-  </section>
-  
-  <section>
-    <p>This demonstration runs entirely client-side, with no server processing.</p>
-    <p>Stay tuned as I add more functionality!</p>
-  </section>
-</article>
-<p><a
-href="https://github.com/AnastasiaBelenkii/browser-embed" target="_blank" rel="noopener noreferrer">Code</a></p>
-<p>Email me at anastasia@belenky.net with thoughts, feelings,
-unsolicited advice, and technical suggestions. Anything at all.
-Please.</p>
+					const element = document.currentScript.parentElement;
 
-<!-- Initialize the search component -->
-<script type="module">
-  import { initializeSearchComponent } from './js/search-component.js';
-  initializeSearchComponent();
-</script>
-</body>
+					Promise.all([
+						import("./_app/immutable/entry/start.G6Yt6ptf.js"),
+						import("./_app/immutable/entry/app.C2PLcNFH.js")
+					]).then(([kit, app]) => {
+						kit.start(app, element, {
+							node_ids: [0, 2],
+							data: [null,null],
+							form: null,
+							error: null
+						});
+					});
+				}
+			</script>
+		</div>
+  </body>
 </html>
