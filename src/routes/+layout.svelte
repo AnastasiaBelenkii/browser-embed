@@ -10,6 +10,7 @@
     if ($page.params.slug) {
       // We're on a post page
       const postTitles = {
+        'optimizers-all-the-way-down': '[DRAFT] Optimizers all the way down',
         'semantic-search': 'Semantic Search'
       };
       

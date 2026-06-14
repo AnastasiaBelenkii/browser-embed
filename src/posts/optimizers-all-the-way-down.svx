@@ -1,0 +1,58 @@
+---
+title: "[DRAFT] Optimizers all the way down"
+description: "Contextgraph, amortization, search, and learning across layers"
+---
+
+Earlier this year I built [contextgraph.me](http://contextgraph.me) -- a 2d infinite canvas that broke LLM conversation turns into nodes and allowed the user to arbitrarily rewire them into a DAG. I built it mostly to compensate for distraction, context poisoning, etc, in frontier models (of a few months ago, so 2-3 minor versions) and in even less capable open source models.
+
+At first it felt like a revelation-- all these new patterns-- creating chains of user-authored nodes instead of having long threads ("potential token savings?" I thought), being able to make really fine-grained, precise edits on long pieces of text, accurately, without having read the text. For certain research-specific tasks that involved a lot of iteration and branching of ideas (that I could then visually merge in the canvas), it felt like a natural extension of my thought process.
+
+Nonetheless, the added layer of writing graph topology added a layer of friction. For actual chat (outside of coding agents), I had mostly been using Claude web anyway (and swearing at it) all through development. By the time I started building features to ingest conversations created in other chat interfaces and designing UI fusions between the canvas and linear chat, models got better. I stopped swearing during linear chat conversations. My commit velocity on the codebase slowed.
+
+I tried to evolve the product, chasing PKM-like objects, and found that shifting into "just another memory system" or "just another PKM" didn't feel satisfying. I began to realize how out of my depth I was in terms of expertise and knowledge if I was to try directly competing on performance with existing approaches and products.
+
+So I went back to the drawing board. I tried, valiantly, to follow slides about ML internals and force myself to write Python by hand, under the logic that "everything was just going to get swallowed by model improvements so I should learn what's going under the hood." I should learn what's going on under the hood, and by Jove, I will! But that resolution was embedded inside a category error-- what I experienced was that a lot of "agentic systems" products were vulnerable to being made irrelevant by either improvements in frontier model capabilities or having features absorbed into core offerings from the big labs. However, in my head, that claim came bundled with the separate claim "real learning happens to the weights and everything else is going to be made irrelevant." There's some truth to that-- plenty of harness work really does get absorbed-- but the claim mislocates the boundary. The same acquired structure (a skill, a prior about the domain, a memory of what worked) can be carried as weights, as text in the context, or as an entry in an external store, more or less interchangeably, because what's being stored is the same in each case-- some structure the system found in its environment-- and structure doesn't care what medium holds it. "In the weights" is a place that learning can sit, not a different species of it. It makes sense that performance and safety-relevant defects that you can describe in a word or two that persist across use cases will be targeted for amelioration by the labs.<sup><a href="#text-learning-note" aria-label="Footnote 1">1</a></sup>
+
+After falling asleep as few times trying to type out a crappy SFT flow, I began trying to deconstruct why contextgraph *felt* like such a big deal to me, even though the current incarnation was looking a little stillborn. I started spending more time on lesswrong, and involuntarily starting to apply metaphors from machine learning to my own creative pursuits (many such cases), and decided to give myself over to a search process inside my own mind, that I had been resisting due to the lack of a concrete deliverable.
+
+That search process is still ongoing-- and it got more productive once I stopped trying to resuscitate contextgraph and went looking for abstractions instead.
+
+What I've found--
+
+I noticed a small set of motifs show up across the layers of a machine-learning system: **priors** (structure built in ahead of time), **search** (spending compute at decision time to find structure), **amortization** (replacing a repeated search with a cheaper learned predictor of its result), **reward and credit assignment**, **exploration vs. exploitation**, and **memory**. The same motif tends to reappear at different layers under different names. Search shows up as tree search over game moves, tree-of-thoughts over reasoning steps, and workflow search over operator graphs. Amortization shows up as AlphaZero distilling tree search into a policy network, as amortized variational inference replacing per-example optimization with an encoder, and -- as recent work makes explicit -- as in-context learning, meta-learning, and prompt tuning all amortizing different parts of a learning process.
+
+My current thought, probably not original: that a technique developed at one layer can often be moved to another by treating it as an instance of one of these motifs and re-binding what plays the role of the policy, the reward, and the search space. I haven't verified this in any rigorous way. Stay tuned!
+
+## Reading
+
+### General
+
+- Richard Sutton, *The Bitter Lesson* (2019) -- the two methods that scale are search and learning. `incompleteideas.net/IncIdeas/BitterLesson.html`
+- Wolpert & Macready, *No Free Lunch Theorems for Optimization* (1997) -- optimization power is always the exploitation of structure in a specific environment.
+- Alex Flint, *The Ground of Optimization* (2020) -- a substrate-independent definition of an "optimizing system."
+- Hubinger et al., *Risks from Learned Optimization in Advanced Machine Learning Systems* (2019, arXiv:1906.01820) -- mesa-optimization; optimizers nested inside optimizers.
+
+### Amortization -- search/inference compiled into a learned predictor
+
+- Gershman & Goodman, *Amortized Inference in Probabilistic Reasoning* (2014) -- the original naming of the motif.
+- Brandon Amos, *Tutorial on Amortized Optimization* (2022, arXiv:2202.00665) -- the motif surveyed across ML.
+- Mittal et al., *Iterative Amortized Inference: Unifying In-Context Learning and Learned Optimizers* (2025, arXiv:2510.11471) -- in-context learning, meta-learning, prompt tuning, and learned optimizers framed as amortizing different aspects of learning.
+
+### Search distilled into a policy -- the canonical case
+
+- Anthony, Tian & Barber, *Thinking Fast and Slow with Deep Learning and Tree Search* (2017, arXiv:1705.08439) -- Expert Iteration.
+- Silver et al., *Mastering Chess and Shogi by Self-Play* (AlphaZero, 2017, arXiv:1712.01815).
+
+### Search at the reasoning / harness layer
+
+- Yao et al., *Tree of Thoughts* (2023, arXiv:2305.10601).
+- Yoonho Lee's writing on text- and harness-optimization (*Feedback Descent*; *Meta-Harness*) -- optimizing the text and the scaffold around a model rather than the model.
+
+### Other
+
+- *CL-bench: A Benchmark for Context Learning* (2026, arXiv:2602.03587) -- raw frontier models, handed exactly the right context, still solve under a quarter of the tasks.
+- ARC-AGI / ARC-AGI-3 -- raw models score poorly; harnesses that build and run executable world models do markedly better.
+
+<hr />
+
+<p id="text-learning-note"><sup>1</sup> <a href="https://yoonholee.com/blog/2026/we-should-take-text-optimization-more-seriously/">There are some solid advantages to having the learning happen in text</a></p>

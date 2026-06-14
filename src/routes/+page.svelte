@@ -3,6 +3,11 @@
   
   const posts = [
     {
+      slug: 'optimizers-all-the-way-down',
+      title: '[DRAFT] Optimizers all the way down',
+      description: 'Contextgraph, amortization, search, and learning across layers'
+    },
+    {
       slug: 'semantic-search',
       title: 'Semantic Search',
       description: 'Understanding embeddings through visualization'
